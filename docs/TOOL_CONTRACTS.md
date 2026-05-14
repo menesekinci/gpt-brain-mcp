@@ -315,6 +315,156 @@ Compatibility alias for older workflows. Prefer `create_implementation_prompt` f
 }
 ```
 
+## `start_planning_workflow`
+
+Starts a strict manual-gated planning workflow under `.chatgpt/workflows/<session_id>/`.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "title": "social-app",
+  "original_user_intent": "Raw user idea. It may be Turkish; artifacts must be English."
+}
+```
+
+**Output:**
+```json
+{
+  "session_id": "20260514-080000-social-app",
+  "state_path": ".chatgpt/workflows/20260514-080000-social-app/workflow.json",
+  "current_phase": "01-intent",
+  "phase_prompt": "...",
+  "artifact_target": ".chatgpt/workflows/20260514-080000-social-app/phases/01-intent-intent.md",
+  "state": { "...": "..." }
+}
+```
+
+## `get_planning_workflow_status`
+
+Returns the workflow state. Read-only.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "session_id": "20260514-080000-social-app"
+}
+```
+
+**Output:**
+```json
+{
+  "state": { "...": "..." }
+}
+```
+
+## `get_current_planning_phase`
+
+Returns the active phase contract, prompt, quality checklist, and target artifact path. Read-only.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "session_id": "20260514-080000-social-app"
+}
+```
+
+**Output:**
+```json
+{
+  "session_id": "20260514-080000-social-app",
+  "current_phase": { "id": "01-intent", "title": "Intent" },
+  "phase_prompt": "...",
+  "artifact_target": ".chatgpt/workflows/20260514-080000-social-app/phases/01-intent-intent.md",
+  "state": { "...": "..." }
+}
+```
+
+## `complete_planning_phase`
+
+Writes the current phase artifact and sets the phase to `awaiting_user_approval`. This tool does not advance to the next phase.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "session_id": "20260514-080000-social-app",
+  "phase_id": "01-intent",
+  "content": "# Intent\n\n..."
+}
+```
+
+**Output:**
+```json
+{
+  "session_id": "20260514-080000-social-app",
+  "phase_id": "01-intent",
+  "written_to": ".chatgpt/workflows/20260514-080000-social-app/phases/01-intent-intent.md",
+  "status": "awaiting_user_approval",
+  "next_action": "Review this phase artifact with the user...",
+  "state": { "...": "..." }
+}
+```
+
+## `approve_planning_phase`
+
+Advances the workflow only after explicit user approval.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "session_id": "20260514-080000-social-app",
+  "phase_id": "01-intent"
+}
+```
+
+**Output:**
+```json
+{
+  "session_id": "20260514-080000-social-app",
+  "approved_phase": "01-intent",
+  "status": "in_progress",
+  "next_phase": { "id": "02-deep-search", "title": "Deep Search" },
+  "phase_prompt": "...",
+  "next_action": "The next phase is now open...",
+  "state": { "...": "..." }
+}
+```
+
+## `finalize_planning_workflow`
+
+Writes the final master dossier and implementation prompts after all ten phases are approved.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "session_id": "20260514-080000-social-app",
+  "master_plan": "# Master Plan\n\n...",
+  "implementation_prompts": [
+    {
+      "title": "P1.1 Auth",
+      "objective": "Implement the P1.1 slice.",
+      "acceptance_criteria": ["Relevant checks pass."]
+    }
+  ]
+}
+```
+
+**Output:**
+```json
+{
+  "session_id": "20260514-080000-social-app",
+  "master_plan_path": ".chatgpt/workflows/20260514-080000-social-app/final/master-plan.md",
+  "implementation_prompts": [".chatgpt/implementation-prompts/2026-05-14-social-app-p1-1-auth.md"],
+  "status": "completed",
+  "state": { "...": "..." }
+}
+```
+
 ## Error Handling
 
 All tools return MCP tool errors (not protocol errors) for business-logic failures:

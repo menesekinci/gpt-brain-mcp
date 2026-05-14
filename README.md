@@ -12,6 +12,7 @@ The server is intentionally narrow. It can inspect safe project files, search co
 - Lists project folders under configured roots and detects common stacks when signals exist.
 - Inspects project structure, reads safe text files, and searches file contents.
 - Writes English planning artifacts under `.chatgpt/` or `.ai/`.
+- Runs strict manual-gated planning workflows under `.chatgpt/workflows/`.
 - Creates generic implementation prompts under `.chatgpt/implementation-prompts/`.
 - Bootstraps project-root `AGENTS.md` so downstream coding agents understand the workflow.
 - Logs tool calls for auditability.
@@ -93,14 +94,24 @@ project-brain-mcp/
 | `bootstrap_project_agents_md` | Write a standard project-root `AGENTS.md` |
 | `create_implementation_prompt` | Write an English generic implementation prompt to `.chatgpt/implementation-prompts/` |
 | `create_kimi_prompt` | Legacy compatibility alias for older saved tool snapshots |
+| `start_planning_workflow` | Start a strict multi-phase planning workflow |
+| `get_planning_workflow_status` | Read workflow state |
+| `get_current_planning_phase` | Read the active phase contract |
+| `complete_planning_phase` | Write the current phase artifact and wait for user approval |
+| `approve_planning_phase` | Advance after explicit user approval |
+| `finalize_planning_workflow` | Write the final dossier and implementation prompts |
 
 ## Planning To Implementation Workflow
 
-1. The planning assistant inspects the project through Project Brain MCP.
-2. It writes an English plan with `create_agent_plan`.
-3. It can bootstrap `AGENTS.md` with `bootstrap_project_agents_md`.
-4. It writes an English implementation prompt with `create_implementation_prompt`.
-5. You run your chosen implementation agent from the project root and pass the generated prompt file:
+For serious product planning, use the staged workflow instead of one large answer:
+
+1. Start with `start_planning_workflow`.
+2. Complete only the current phase with `complete_planning_phase`.
+3. Review the artifact with the user.
+4. When the user explicitly says to continue, call `approve_planning_phase`.
+5. Repeat until `10-review-test` is approved.
+6. Call `finalize_planning_workflow` to write `final/master-plan.md` and implementation prompts.
+7. Run your chosen implementation agent from the target project root and pass a generated prompt file:
 
 ```powershell
 <agent-command> < ".chatgpt/implementation-prompts/<prompt-file>.md"

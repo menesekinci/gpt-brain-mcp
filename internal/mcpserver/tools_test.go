@@ -132,3 +132,65 @@ func TestCreateImplementationPrompt(t *testing.T) {
 		t.Fatalf("expected generic implementation prompt content")
 	}
 }
+
+func TestPlanningWorkflowToolFlow(t *testing.T) {
+	root := t.TempDir()
+	projectPath := filepath.Join(root, "app")
+	if err := os.MkdirAll(projectPath, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	srv := newTestServer(t, root)
+
+	_, start, err := srv.handleStartPlanningWorkflow(context.Background(), nil, StartPlanningWorkflowInput{
+		ProjectID:          "personal-projects:app",
+		Title:              "Social App",
+		OriginalUserIntent: "Sosyal uygulama fikri.",
+	})
+	if err != nil {
+		t.Fatalf("start workflow failed: %v", err)
+	}
+	if start.CurrentPhase != "01-intent" {
+		t.Fatalf("expected 01-intent, got %s", start.CurrentPhase)
+	}
+	if !strings.HasPrefix(start.StatePath, ".chatgpt/workflows/") {
+		t.Fatalf("unexpected state path: %s", start.StatePath)
+	}
+
+	callResult, _, err := srv.handleCompletePlanningPhase(context.Background(), nil, CompletePlanningPhaseInput{
+		ProjectID: "personal-projects:app",
+		SessionID: start.SessionID,
+		PhaseID:   "02-deep-search",
+		Content:   "# Wrong",
+	})
+	if err != nil || callResult == nil || !callResult.IsError {
+		t.Fatal("expected non-current phase completion to fail")
+	}
+
+	_, completed, err := srv.handleCompletePlanningPhase(context.Background(), nil, CompletePlanningPhaseInput{
+		ProjectID: "personal-projects:app",
+		SessionID: start.SessionID,
+		PhaseID:   "01-intent",
+		Content:   "# Intent\n\n## Summary\n\nIntent captured.",
+	})
+	if err != nil {
+		t.Fatalf("complete phase failed: %v", err)
+	}
+	if completed.Status != "awaiting_user_approval" {
+		t.Fatalf("expected awaiting_user_approval, got %s", completed.Status)
+	}
+	if completed.State.CurrentPhase != "01-intent" {
+		t.Fatalf("phase advanced without approval: %s", completed.State.CurrentPhase)
+	}
+
+	_, approved, err := srv.handleApprovePlanningPhase(context.Background(), nil, ApprovePlanningPhaseInput{
+		ProjectID: "personal-projects:app",
+		SessionID: start.SessionID,
+		PhaseID:   "01-intent",
+	})
+	if err != nil {
+		t.Fatalf("approve phase failed: %v", err)
+	}
+	if approved.NextPhase == nil || approved.NextPhase.ID != "02-deep-search" {
+		t.Fatalf("expected next phase, got %+v", approved.NextPhase)
+	}
+}

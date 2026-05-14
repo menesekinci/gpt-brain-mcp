@@ -7,10 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/enes/project-brain-mcp/internal/fsx"
 	"github.com/enes/project-brain-mcp/internal/plans"
 	"github.com/enes/project-brain-mcp/internal/project"
+	"github.com/enes/project-brain-mcp/internal/workflow"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -90,6 +92,37 @@ type CreateImplementationPromptInput struct {
 
 type CreateKimiPromptInput = CreateImplementationPromptInput
 
+type StartPlanningWorkflowInput struct {
+	ProjectID          string `json:"project_id" jsonschema:"Project identifier"`
+	Title              string `json:"title" jsonschema:"Short title for this planning workflow"`
+	OriginalUserIntent string `json:"original_user_intent" jsonschema:"Raw user idea or product intent. It may be in any language; artifacts must be English."`
+}
+
+type PlanningWorkflowSessionInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+	SessionID string `json:"session_id" jsonschema:"Planning workflow session identifier"`
+}
+
+type CompletePlanningPhaseInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+	SessionID string `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	PhaseID   string `json:"phase_id" jsonschema:"Current phase identifier"`
+	Content   string `json:"content" jsonschema:"English markdown content for the current phase artifact"`
+}
+
+type ApprovePlanningPhaseInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+	SessionID string `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	PhaseID   string `json:"phase_id" jsonschema:"Current phase identifier that the user explicitly approved"`
+}
+
+type FinalizePlanningWorkflowInput struct {
+	ProjectID             string                          `json:"project_id" jsonschema:"Project identifier"`
+	SessionID             string                          `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	MasterPlan            string                          `json:"master_plan" jsonschema:"English consolidated master planning dossier markdown"`
+	ImplementationPrompts []workflow.ImplementationPrompt `json:"implementation_prompts" jsonschema:"Implementation prompt slices to write after the workflow is approved"`
+}
+
 type RootInfo struct {
 	ID       string `json:"id" jsonschema:"Configured root identifier"`
 	Name     string `json:"name" jsonschema:"Human readable root name"`
@@ -158,6 +191,54 @@ type ImplementationPromptOutput struct {
 }
 
 type KimiPromptOutput = ImplementationPromptOutput
+
+type StartPlanningWorkflowOutput struct {
+	SessionID      string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	StatePath      string         `json:"state_path" jsonschema:"Relative path to workflow.json"`
+	CurrentPhase   string         `json:"current_phase" jsonschema:"Current open phase identifier"`
+	PhasePrompt    string         `json:"phase_prompt" jsonschema:"Prompt/contract for the current phase only"`
+	ArtifactTarget string         `json:"artifact_target" jsonschema:"Relative target path for the current phase artifact"`
+	State          workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type PlanningWorkflowStatusOutput struct {
+	State workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type CurrentPlanningPhaseOutput struct {
+	SessionID      string                   `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	CurrentPhase   workflow.PhaseDefinition `json:"current_phase" jsonschema:"Current phase definition"`
+	PhasePrompt    string                   `json:"phase_prompt" jsonschema:"Prompt/contract for the current phase only"`
+	ArtifactTarget string                   `json:"artifact_target" jsonschema:"Relative target path for the current phase artifact"`
+	State          workflow.State           `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type CompletePlanningPhaseOutput struct {
+	SessionID  string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	PhaseID    string         `json:"phase_id" jsonschema:"Completed phase identifier"`
+	WrittenTo  string         `json:"written_to" jsonschema:"Relative path of the phase artifact that was written"`
+	Status     string         `json:"status" jsonschema:"Phase status after completion"`
+	NextAction string         `json:"next_action" jsonschema:"Manual gate instruction for the assistant"`
+	State      workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type ApprovePlanningPhaseOutput struct {
+	SessionID     string                    `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	ApprovedPhase string                    `json:"approved_phase" jsonschema:"Approved phase identifier"`
+	Status        string                    `json:"status" jsonschema:"Workflow status after approval"`
+	NextPhase     *workflow.PhaseDefinition `json:"next_phase,omitempty" jsonschema:"Next phase definition if another phase is open"`
+	PhasePrompt   string                    `json:"phase_prompt,omitempty" jsonschema:"Prompt/contract for the next phase only"`
+	NextAction    string                    `json:"next_action" jsonschema:"Next manual-gated workflow action"`
+	State         workflow.State            `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type FinalizePlanningWorkflowOutput struct {
+	SessionID             string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	MasterPlanPath        string         `json:"master_plan_path" jsonschema:"Relative path of the final master planning dossier"`
+	ImplementationPrompts []string       `json:"implementation_prompts" jsonschema:"Relative paths of generated implementation prompts"`
+	Status                string         `json:"status" jsonschema:"Workflow status after finalization"`
+	State                 workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
+}
 
 // ===== Tool Registration =====
 
@@ -239,6 +320,42 @@ func (s *Server) registerTools() {
 		Description: "Compatibility alias for older workflows. Prefer create_implementation_prompt for new tasks. Creates a generic English implementation prompt without assuming a specific implementation agent, model, IDE, or CLI.",
 		Annotations: planningWriteTool("Create implementation prompt"),
 	}, s.handleCreateKimiPrompt)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "start_planning_workflow",
+		Description: "Starts a strict manual-gated multi-phase planning workflow under .chatgpt/workflows. Use this for serious product/project planning instead of trying to produce the whole plan in one answer.",
+		Annotations: planningWriteTool("Start planning workflow"),
+	}, s.handleStartPlanningWorkflow)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_planning_workflow_status",
+		Description: "Returns the current state of a planning workflow session. Read-only.",
+		Annotations: readOnlyTool("Get planning workflow status"),
+	}, s.handleGetPlanningWorkflowStatus)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "get_current_planning_phase",
+		Description: "Returns the active phase contract, required sections, quality checklist, prompt, and target artifact path. Read-only.",
+		Annotations: readOnlyTool("Get current planning phase"),
+	}, s.handleGetCurrentPlanningPhase)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "complete_planning_phase",
+		Description: "Writes the current phase artifact and moves the phase to awaiting_user_approval. It never advances to the next phase automatically.",
+		Annotations: planningWriteTool("Complete planning phase"),
+	}, s.handleCompletePlanningPhase)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "approve_planning_phase",
+		Description: "Advances a workflow only after the user explicitly approves the current phase or says continue.",
+		Annotations: planningWriteTool("Approve planning phase"),
+	}, s.handleApprovePlanningPhase)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "finalize_planning_workflow",
+		Description: "Writes the final master planning dossier and implementation prompts after all planning phases are approved.",
+		Annotations: planningWriteTool("Finalize planning workflow"),
+	}, s.handleFinalizePlanningWorkflow)
 }
 
 func readOnlyTool(title string) *mcp.ToolAnnotations {
@@ -621,5 +738,179 @@ func (s *Server) createImplementationPrompt(input CreateImplementationPromptInpu
 		WrittenTo:       relPath,
 		Status:          "created",
 		CommandGuidance: "From the project root, pass this prompt file to your chosen implementation agent and instruct it to follow the file exactly.",
+	})
+}
+
+func (s *Server) handleStartPlanningWorkflow(ctx context.Context, req *mcp.CallToolRequest, input StartPlanningWorkflowInput) (*mcp.CallToolResult, StartPlanningWorkflowOutput, error) {
+	if err := s.checkToolRate("start_planning_workflow"); err != nil {
+		s.audit("start_planning_workflow", input.ProjectID, "", "blocked", err.Error(), 0)
+		return errorResult[StartPlanningWorkflowOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("start_planning_workflow", input.ProjectID, "", "blocked", err.Error(), 0)
+		return errorResult[StartPlanningWorkflowOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if root.ReadOnly {
+		s.audit("start_planning_workflow", input.ProjectID, "", "blocked", "root is read-only", 0)
+		return errorResult[StartPlanningWorkflowOutput]("Workflow writes are blocked because this root is read-only")
+	}
+	result, err := workflow.Start(absPath, input.ProjectID, input.Title, input.OriginalUserIntent, time.Now())
+	if err != nil {
+		s.audit("start_planning_workflow", input.ProjectID, "", "error", err.Error(), 0)
+		return errorResult[StartPlanningWorkflowOutput](fmt.Sprintf("Workflow start failed: %v", err))
+	}
+	s.audit("start_planning_workflow", input.ProjectID, result.StatePath, "allowed", "", len(result.PhasePrompt))
+	return jsonContent(StartPlanningWorkflowOutput{
+		SessionID:      result.State.SessionID,
+		StatePath:      result.StatePath,
+		CurrentPhase:   result.State.CurrentPhase,
+		PhasePrompt:    result.PhasePrompt,
+		ArtifactTarget: result.ArtifactTarget,
+		State:          result.State,
+	})
+}
+
+func (s *Server) handleGetPlanningWorkflowStatus(ctx context.Context, req *mcp.CallToolRequest, input PlanningWorkflowSessionInput) (*mcp.CallToolResult, PlanningWorkflowStatusOutput, error) {
+	if err := s.checkToolRate("get_planning_workflow_status"); err != nil {
+		s.audit("get_planning_workflow_status", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[PlanningWorkflowStatusOutput](err.Error())
+	}
+	_, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("get_planning_workflow_status", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[PlanningWorkflowStatusOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	state, err := workflow.Load(absPath, input.SessionID)
+	if err != nil {
+		s.audit("get_planning_workflow_status", input.ProjectID, input.SessionID, "error", err.Error(), 0)
+		return errorResult[PlanningWorkflowStatusOutput](fmt.Sprintf("Load workflow failed: %v", err))
+	}
+	s.audit("get_planning_workflow_status", input.ProjectID, input.SessionID, "allowed", "", 0)
+	return jsonContent(PlanningWorkflowStatusOutput{State: state})
+}
+
+func (s *Server) handleGetCurrentPlanningPhase(ctx context.Context, req *mcp.CallToolRequest, input PlanningWorkflowSessionInput) (*mcp.CallToolResult, CurrentPlanningPhaseOutput, error) {
+	if err := s.checkToolRate("get_current_planning_phase"); err != nil {
+		s.audit("get_current_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CurrentPlanningPhaseOutput](err.Error())
+	}
+	_, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("get_current_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CurrentPlanningPhaseOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	state, err := workflow.Load(absPath, input.SessionID)
+	if err != nil {
+		s.audit("get_current_planning_phase", input.ProjectID, input.SessionID, "error", err.Error(), 0)
+		return errorResult[CurrentPlanningPhaseOutput](fmt.Sprintf("Load workflow failed: %v", err))
+	}
+	phase, err := workflow.CurrentPhase(state)
+	if err != nil {
+		s.audit("get_current_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CurrentPlanningPhaseOutput](err.Error())
+	}
+	prompt := workflow.PhasePrompt(state, phase)
+	s.audit("get_current_planning_phase", input.ProjectID, input.SessionID, "allowed", "", len(prompt))
+	return jsonContent(CurrentPlanningPhaseOutput{
+		SessionID:      state.SessionID,
+		CurrentPhase:   phase,
+		PhasePrompt:    prompt,
+		ArtifactTarget: workflow.PhaseArtifactRelPath(state.SessionID, phase.ID, phase.Title),
+		State:          state,
+	})
+}
+
+func (s *Server) handleCompletePlanningPhase(ctx context.Context, req *mcp.CallToolRequest, input CompletePlanningPhaseInput) (*mcp.CallToolResult, CompletePlanningPhaseOutput, error) {
+	if err := s.checkToolRate("complete_planning_phase"); err != nil {
+		s.audit("complete_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CompletePlanningPhaseOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("complete_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CompletePlanningPhaseOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if root.ReadOnly {
+		s.audit("complete_planning_phase", input.ProjectID, input.SessionID, "blocked", "root is read-only", 0)
+		return errorResult[CompletePlanningPhaseOutput]("Workflow writes are blocked because this root is read-only")
+	}
+	result, err := workflow.Complete(absPath, input.SessionID, input.PhaseID, input.Content, time.Now())
+	if err != nil {
+		s.audit("complete_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[CompletePlanningPhaseOutput](fmt.Sprintf("Complete phase failed: %v", err))
+	}
+	s.audit("complete_planning_phase", input.ProjectID, result.WrittenTo, "allowed", "", len(input.Content))
+	return jsonContent(CompletePlanningPhaseOutput{
+		SessionID:  result.State.SessionID,
+		PhaseID:    input.PhaseID,
+		WrittenTo:  result.WrittenTo,
+		Status:     workflow.PhaseAwaitingUserApproval,
+		NextAction: result.NextAction,
+		State:      result.State,
+	})
+}
+
+func (s *Server) handleApprovePlanningPhase(ctx context.Context, req *mcp.CallToolRequest, input ApprovePlanningPhaseInput) (*mcp.CallToolResult, ApprovePlanningPhaseOutput, error) {
+	if err := s.checkToolRate("approve_planning_phase"); err != nil {
+		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[ApprovePlanningPhaseOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[ApprovePlanningPhaseOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if root.ReadOnly {
+		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", "root is read-only", 0)
+		return errorResult[ApprovePlanningPhaseOutput]("Workflow writes are blocked because this root is read-only")
+	}
+	result, err := workflow.Approve(absPath, input.SessionID, input.PhaseID, time.Now())
+	if err != nil {
+		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[ApprovePlanningPhaseOutput](fmt.Sprintf("Approve phase failed: %v", err))
+	}
+	phasePrompt := ""
+	if result.NextPhase != nil {
+		phasePrompt = workflow.PhasePrompt(result.State, *result.NextPhase)
+	}
+	s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "allowed", "", len(phasePrompt))
+	return jsonContent(ApprovePlanningPhaseOutput{
+		SessionID:     result.State.SessionID,
+		ApprovedPhase: input.PhaseID,
+		Status:        result.State.Status,
+		NextPhase:     result.NextPhase,
+		PhasePrompt:   phasePrompt,
+		NextAction:    result.NextAction,
+		State:         result.State,
+	})
+}
+
+func (s *Server) handleFinalizePlanningWorkflow(ctx context.Context, req *mcp.CallToolRequest, input FinalizePlanningWorkflowInput) (*mcp.CallToolResult, FinalizePlanningWorkflowOutput, error) {
+	if err := s.checkToolRate("finalize_planning_workflow"); err != nil {
+		s.audit("finalize_planning_workflow", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[FinalizePlanningWorkflowOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("finalize_planning_workflow", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[FinalizePlanningWorkflowOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if root.ReadOnly {
+		s.audit("finalize_planning_workflow", input.ProjectID, input.SessionID, "blocked", "root is read-only", 0)
+		return errorResult[FinalizePlanningWorkflowOutput]("Workflow writes are blocked because this root is read-only")
+	}
+	result, err := workflow.Finalize(absPath, input.SessionID, input.MasterPlan, input.ImplementationPrompts, time.Now())
+	if err != nil {
+		s.audit("finalize_planning_workflow", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
+		return errorResult[FinalizePlanningWorkflowOutput](fmt.Sprintf("Finalize workflow failed: %v", err))
+	}
+	s.audit("finalize_planning_workflow", input.ProjectID, result.MasterPlanPath, "allowed", "", len(input.MasterPlan))
+	return jsonContent(FinalizePlanningWorkflowOutput{
+		SessionID:             result.State.SessionID,
+		MasterPlanPath:        result.MasterPlanPath,
+		ImplementationPrompts: result.ImplementationPrompts,
+		Status:                result.State.Status,
+		State:                 result.State,
 	})
 }

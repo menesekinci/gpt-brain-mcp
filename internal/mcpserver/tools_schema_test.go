@@ -70,11 +70,40 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 			}
 		}
 	}
+	for _, name := range []string{
+		"create_project_analysis_note",
+		"create_agent_plan",
+		"create_agent_handoff",
+		"bootstrap_project_agents_md",
+		"create_implementation_prompt",
+		"create_kimi_prompt",
+		"start_planning_workflow",
+		"complete_planning_phase",
+		"approve_planning_phase",
+		"finalize_planning_workflow",
+	} {
+		for _, tool := range tools.Tools {
+			if tool.Name == name {
+				if tool.Annotations.ReadOnlyHint {
+					t.Fatalf("tool %q should not be marked read-only", name)
+				}
+				if tool.Annotations.DestructiveHint == nil || *tool.Annotations.DestructiveHint {
+					t.Fatalf("tool %q should be marked non-destructive", name)
+				}
+			}
+		}
+	}
 	for _, want := range []string{
 		"get_project_brain_guide",
 		"bootstrap_project_agents_md",
 		"create_implementation_prompt",
 		"create_kimi_prompt",
+		"start_planning_workflow",
+		"get_planning_workflow_status",
+		"get_current_planning_phase",
+		"complete_planning_phase",
+		"approve_planning_phase",
+		"finalize_planning_workflow",
 	} {
 		if !names[want] {
 			t.Fatalf("expected tool %q to be registered", want)
