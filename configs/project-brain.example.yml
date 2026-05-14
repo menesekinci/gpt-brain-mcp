@@ -1,0 +1,77 @@
+server:
+  listen_addr: "127.0.0.1:3939"
+  public_base_url: "https://your-tunnel-or-domain.example.com"
+  mcp_path: "/mcp"
+
+security:
+  mode: "planning_write"
+  owner_email: "you@example.com"
+  max_file_bytes: 250000
+  max_tree_entries: 3000
+  max_search_results: 100
+  allow_binary_files: false
+  redact_secrets: true
+  audit_log: true
+
+roots:
+  - id: "personal-projects"
+    name: "Personal Projects"
+    path: "~/Projects"
+    writable_plan_dirs:
+      - ".chatgpt"
+      - ".ai"
+    read_only: false
+
+  - id: "code-repos"
+    name: "Code Repositories"
+    path: "~/Code"
+    writable_plan_dirs:
+      - ".chatgpt"
+      - ".ai"
+    read_only: false
+
+ignore:
+  dirs:
+    - ".git"
+    - "node_modules"
+    - "vendor"
+    - "dist"
+    - "build"
+    - ".next"
+    - ".turbo"
+    - ".cache"
+    - ".venv"
+    - "venv"
+    - "__pycache__"
+    - ".pytest_cache"
+    - "target"
+    - "bin"
+    - "obj"
+    - ".idea"
+    - ".vscode"
+  files:
+    - ".env"
+    - ".env.*"
+    - ".envrc"
+    - "id_rsa"
+    - "id_ed25519"
+    - "id_ecdsa"
+    - "*.pem"
+    - "*.key"
+    - "*.pfx"
+    - "*.p12"
+    - "secrets.*"
+    - "credentials.*"
+    - ".DS_Store"
+    - "Thumbs.db"
+
+auth:
+  type: "oauth"
+  # issuer_url is auto-set when using --issuer-url flag or launch.bat/launch.sh
+  # For manual use, paste your public HTTPS URL here.
+  issuer_url: ""
+  client_id: "project-brain-client"
+  redirect_uri: ""
+  owner_secret: "CHANGE_THIS_TO_A_LONG_RANDOM_VALUE"
+  jwt_secret: "CHANGE_THIS_TO_ANOTHER_LONG_RANDOM_VALUE"
+  token_expiry_minutes: 60

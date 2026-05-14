@@ -1,0 +1,9 @@
+configs/project-brain.yml
+server.exe
+server.exe~
+.chatgpt/
+.ai/
+.playwright-mcp/
+*.png
+*.log
+*.tmp

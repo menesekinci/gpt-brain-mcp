@@ -1,0 +1,146 @@
+package plans
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestGenerate(t *testing.T) {
+	relPath, data, err := Generate("root:my-app", TypePlan, "Auth Refactor", "# Plan\n\nDetails here.")
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	if !strings.HasPrefix(relPath, ".chatgpt/plans/") {
+		t.Errorf("expected path under .chatgpt/plans/, got %q", relPath)
+	}
+	if !strings.HasSuffix(relPath, "-auth-refactor.md") {
+		t.Errorf("expected filename ending in -auth-refactor.md, got %q", relPath)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "type: plan") {
+		t.Errorf("expected frontmatter with type plan")
+	}
+	if !strings.Contains(content, "# Plan") {
+		t.Errorf("expected body content")
+	}
+}
+
+func TestGenerateAgentHandoff(t *testing.T) {
+	relPath, data, err := GenerateAgentHandoff("root:my-app", "codex", "Implement Auth", "# Task\n\nDo this.")
+	if err != nil {
+		t.Fatalf("GenerateAgentHandoff failed: %v", err)
+	}
+
+	if !strings.HasPrefix(relPath, ".chatgpt/handoffs/") {
+		t.Errorf("expected path under .chatgpt/handoffs/, got %q", relPath)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "agent: codex") {
+		t.Errorf("expected frontmatter with agent name")
+	}
+}
+
+func TestGenerateKimiPrompt(t *testing.T) {
+	content := KimiPromptTemplate(KimiPromptSpec{
+		TaskTitle:          "Implement Auth",
+		Objective:          "Implement the authentication change.",
+		PlanPath:           ".chatgpt/plans/2026-05-14-auth.md",
+		ContextFiles:       []string{"internal/auth/token.go"},
+		Constraints:        []string{"Keep the public API stable."},
+		AcceptanceCriteria: []string{"go test ./... passes."},
+	})
+
+	relPath, data, err := Generate("root:my-app", TypeKimi, "Implement Auth", content)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+	if !strings.HasPrefix(relPath, ".chatgpt/kimi/") {
+		t.Errorf("expected path under .chatgpt/kimi/, got %q", relPath)
+	}
+
+	body := string(data)
+	for _, want := range []string{
+		"type: kimi_prompt",
+		"Keep all planning notes, summaries, commit messages, and user-facing text in English.",
+		"Project Brain MCP",
+		".chatgpt/plans/2026-05-14-auth.md",
+		"internal/auth/token.go",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected generated prompt to contain %q", want)
+		}
+	}
+}
+
+func TestGenerateImplementationPrompt(t *testing.T) {
+	content := ImplementationPromptTemplate(ImplementationPromptSpec{
+		TaskTitle:          "Implement Auth",
+		Objective:          "Implement the authentication change.",
+		PlanPath:           ".chatgpt/plans/2026-05-14-auth.md",
+		ContextFiles:       []string{"internal/auth/token.go"},
+		Constraints:        []string{"Keep the public API stable."},
+		AcceptanceCriteria: []string{"go test ./... passes."},
+	})
+
+	relPath, data, err := Generate("root:my-app", TypeImplementationPrompt, "Implement Auth", content)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+	if !strings.HasPrefix(relPath, ".chatgpt/implementation-prompts/") {
+		t.Errorf("expected path under .chatgpt/implementation-prompts/, got %q", relPath)
+	}
+
+	body := string(data)
+	for _, want := range []string{
+		"type: implementation_prompt",
+		"You are the implementation agent for this repository.",
+		"Project Brain MCP",
+		".chatgpt/plans/2026-05-14-auth.md",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected generated prompt to contain %q", want)
+		}
+	}
+}
+
+func TestProjectBrainGuideAndAgentsTemplatesAreGeneric(t *testing.T) {
+	combined := ProjectBrainGuideTemplate("both") + "\n" + ProjectAgentsTemplate()
+	for _, banned := range []string{"Kimi", "GPT 5.5", "Code CLI"} {
+		if strings.Contains(combined, banned) {
+			t.Errorf("expected reusable templates not to contain %q", banned)
+		}
+	}
+	for _, want := range []string{
+		"Project Brain MCP",
+		"planning assistant",
+		"implementation agent",
+		".chatgpt/",
+		".ai/",
+	} {
+		if !strings.Contains(combined, want) {
+			t.Errorf("expected reusable templates to contain %q", want)
+		}
+	}
+}
+
+func TestSlugify(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"Hello World", "hello-world"},
+		{"Auth Refactor Plan", "auth-refactor-plan"},
+		{"  Spaces  ", "spaces"},
+		{"Special!@#Chars", "special-chars"},
+	}
+
+	for _, tt := range tests {
+		got := slugify(tt.input)
+		if got != tt.expected {
+			t.Errorf("slugify(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}

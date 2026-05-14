@@ -1,0 +1,7 @@
+tunnel: <TUNNEL_UUID>
+credentials-file: ~/.cloudflared/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: mcp.example.com
+    service: http://localhost:3939
+  - service: http_status:404
