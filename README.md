@@ -21,7 +21,7 @@ The server is intentionally narrow. It can inspect safe project files, search co
 ## Security Model
 
 - Default mode is `planning_write`: read allowed files, search, inspect, and write markdown-only planning artifacts.
-- Writes are limited to `.chatgpt/`, `.ai/`, and the exact project-root `AGENTS.md` file.
+- Writes are limited to `.chatgpt/`, `.ai/`, the exact project-root `AGENTS.md`, and root `fromgpt.md` for planning-assistant messages.
 - Source files, environment files, credentials, generated dependency directories, and secret-like files are blocked.
 - Path canonicalization rejects traversal, symlink escapes, and absolute path bypasses.
 - Secret redaction is applied before file contents are returned.
@@ -100,6 +100,8 @@ project-brain-mcp/
 | `complete_planning_phase` | Write the current phase artifact and wait for user approval |
 | `approve_planning_phase` | Advance after explicit user approval |
 | `finalize_planning_workflow` | Write the final dossier and implementation prompts |
+| `read_togpt_message` | Read root `togpt.md` written by an implementation agent |
+| `append_fromgpt_message` | Append a timestamped planning-assistant message to root `fromgpt.md` |
 
 ## Planning To Implementation Workflow
 
@@ -118,6 +120,8 @@ For serious product planning, use the staged workflow instead of one large answe
 ```
 
 Implementation happens outside the MCP server in the implementation agent's own runtime and approval model.
+
+Implementation agents should read `fromgpt.md` before working and write `togpt.md` after each assigned task. Project Brain can read `togpt.md` and append timestamped follow-up messages to `fromgpt.md`.
 
 ## Tunnel Choice
 

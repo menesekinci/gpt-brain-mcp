@@ -132,5 +132,7 @@ From the target project root:
 
 - Project Brain reads files and writes markdown planning artifacts only.
 - Project Brain may also write a project-root `AGENTS.md` bootstrap file.
+- Project Brain may append timestamped planning-assistant messages to project-root `fromgpt.md`.
+- Downstream implementation agents may write project-root `togpt.md`; Project Brain can read it as the agent response channel.
 - Project Brain does not execute shell commands and does not run implementation agents.
 - Implementation happens in the downstream agent's own runtime and approval model.

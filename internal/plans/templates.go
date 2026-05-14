@@ -85,11 +85,13 @@ You are the implementation agent for this repository.
 - Treat this file as the primary task brief.
 - Keep all planning notes, summaries, commit messages, and user-facing text in English.
 - Be aware that a planning assistant may create plans, prompts, and notes in this repository through Project Brain MCP.
+- Before starting, read root fromgpt.md if it exists; it may contain newer planning-assistant instructions or revisions.
 - Read the referenced plan and files before editing.
 - Make the smallest coherent code changes that satisfy the objective.
 - Do not broaden scope without an explicit reason in your final summary.
 - Do not read or expose secrets. Do not modify credentials, environment files, or generated dependency directories.
 - Run the most relevant tests or checks available in the repository. If a check cannot run, explain why.
+- After finishing, write or update root togpt.md with a timestamped implementation report for the planning assistant.
 
 ## Objective
 
@@ -173,6 +175,7 @@ func ProjectBrainGuideTemplate(audience string) string {
 - Referenced plans, prompts, and handoff files are task-brief artifacts.
 - Repository conventions, existing architecture, and local tests define the implementation baseline.
 - The implementation agent receives task briefs through referenced planning artifacts.
+- The planning assistant can communicate revisions through root fromgpt.md, and the implementation agent reports back through root togpt.md.
 - Source changes stay scoped to the requested objective.
 - Secrets, credentials, environment files, and generated dependency directories are outside the intended workflow.
 - Final implementation reports include changed files, tests or checks run, skipped validation, risks, and follow-up work.
@@ -206,12 +209,16 @@ Project Brain MCP is a constrained planning bridge. A planning assistant can ins
 ## How to Work
 
 - Read the referenced plan, prompt, or handoff before editing.
+- Read root fromgpt.md if it exists; it may contain newer planning-assistant instructions, revisions, or review notes.
 - Treat planning artifacts as the task brief unless the user gives a newer instruction.
 - Follow the repository's existing architecture, style, naming, and test conventions.
 - Keep changes scoped to the requested objective.
 - Do not broaden the task without explaining the reason in your final response.
 - Do not read, expose, or modify secrets, credentials, environment files, or generated dependency directories.
 - Keep planning notes, summaries, commit messages, and user-facing implementation reports in English unless the user explicitly requests otherwise.
+- After every assigned task, create or update root togpt.md with a timestamped response for the planning assistant.
+- The togpt.md response should include: completed work, changed files, tests/checks run, skipped validation, risks, questions, and recommended next action.
+- Do not put secrets, credentials, private keys, or environment values in togpt.md.
 
 ## Validation
 

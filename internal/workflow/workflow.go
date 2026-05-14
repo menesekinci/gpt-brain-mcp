@@ -506,6 +506,8 @@ generated_by: chatgpt
 
 You are the implementation agent for this repository.
 
+Before editing, read root fromgpt.md if it exists. It may contain newer planning-assistant instructions or revisions.
+
 ## Source Dossier
 
 %s
@@ -536,6 +538,8 @@ You are the implementation agent for this repository.
 - Tests or checks run
 - Skipped validation and why
 - Remaining risks or follow-up work
+
+Also create or update root togpt.md with a timestamped report containing completed work, changed files, tests/checks run, skipped validation, risks, questions, and recommended next action.
 `, state.SessionID, state.ProjectID, now.UTC().Format(time.RFC3339), fallback(prompt.Title, "Implementation Slice"), masterPlanPath, fallback(prompt.Objective, "Implement the referenced slice from the master planning dossier."), markdownListOr(prompt.ContextFiles, "Inspect the repository and the source dossier before editing."), markdownListOr(prompt.Constraints, "Keep the change scoped to this implementation slice."), markdownListOr(prompt.AcceptanceCriteria, "Relevant checks pass and the source dossier requirements are satisfied."), fallback(prompt.Notes, "None."))
 }
 

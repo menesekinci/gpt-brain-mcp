@@ -465,6 +465,57 @@ Writes the final master dossier and implementation prompts after all ten phases 
 }
 ```
 
+## `read_togpt_message`
+
+Reads root `togpt.md`, the timestamped response file written by a downstream implementation agent.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app"
+}
+```
+
+**Output when present:**
+```json
+{
+  "path": "togpt.md",
+  "status": "found",
+  "content": "## 2026-05-14T09:00:00Z\n..."
+}
+```
+
+**Output when missing:**
+```json
+{
+  "path": "togpt.md",
+  "status": "missing",
+  "content": ""
+}
+```
+
+## `append_fromgpt_message`
+
+Appends a timestamped planning-assistant message to root `fromgpt.md` for the downstream implementation agent.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "title": "Revision",
+  "message": "Please revise P1.1 according to the updated review notes."
+}
+```
+
+**Output:**
+```json
+{
+  "written_to": "fromgpt.md",
+  "status": "created",
+  "timestamp": "2026-05-14T09:00:00Z"
+}
+```
+
 ## Error Handling
 
 All tools return MCP tool errors (not protocol errors) for business-logic failures:

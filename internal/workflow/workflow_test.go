@@ -117,6 +117,13 @@ func TestFinalizeRequiresAllPhasesApproved(t *testing.T) {
 	if len(result.ImplementationPrompts) != 1 || !strings.HasPrefix(result.ImplementationPrompts[0], ".chatgpt/implementation-prompts/") {
 		t.Fatalf("unexpected implementation prompt paths: %+v", result.ImplementationPrompts)
 	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(result.ImplementationPrompts[0])))
+	if err != nil {
+		t.Fatalf("read implementation prompt: %v", err)
+	}
+	if !strings.Contains(string(data), "fromgpt.md") || !strings.Contains(string(data), "togpt.md") {
+		t.Fatalf("expected implementation prompt to mention communication files")
+	}
 }
 
 func TestPhaseTemplatesContainRequiredEnglishHeadings(t *testing.T) {

@@ -81,7 +81,8 @@ func (g *Guard) IsWriteAllowed(absPath string, projectAbsPath string, root app.R
 			return fmt.Errorf("sensitive file blocked")
 		}
 	}
-	if filepath.Clean(rel) == "AGENTS.md" {
+	switch filepath.Clean(rel) {
+	case "AGENTS.md", "fromgpt.md":
 		return nil
 	}
 	// Must be under one of the writable plan directories.

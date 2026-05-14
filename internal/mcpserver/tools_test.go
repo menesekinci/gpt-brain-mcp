@@ -194,3 +194,54 @@ func TestPlanningWorkflowToolFlow(t *testing.T) {
 		t.Fatalf("expected next phase, got %+v", approved.NextPhase)
 	}
 }
+
+func TestAgentMessageFiles(t *testing.T) {
+	root := t.TempDir()
+	projectPath := filepath.Join(root, "app")
+	if err := os.MkdirAll(projectPath, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	srv := newTestServer(t, root)
+
+	_, missing, err := srv.handleReadToGPTMessage(context.Background(), nil, ReadToGPTMessageInput{
+		ProjectID: "personal-projects:app",
+	})
+	if err != nil {
+		t.Fatalf("read missing togpt failed: %v", err)
+	}
+	if missing.Status != "missing" {
+		t.Fatalf("expected missing status, got %+v", missing)
+	}
+
+	_, out, err := srv.handleAppendFromGPTMessage(context.Background(), nil, AppendFromGPTMessageInput{
+		ProjectID: "personal-projects:app",
+		Title:     "Review Notes",
+		Message:   "Please revise P1.1 according to the latest plan.",
+	})
+	if err != nil {
+		t.Fatalf("append fromgpt failed: %v", err)
+	}
+	if out.WrittenTo != "fromgpt.md" || out.Status != "created" || out.Timestamp == "" {
+		t.Fatalf("unexpected append output: %+v", out)
+	}
+	fromGPT, err := os.ReadFile(filepath.Join(projectPath, "fromgpt.md"))
+	if err != nil {
+		t.Fatalf("read fromgpt.md: %v", err)
+	}
+	if !strings.Contains(string(fromGPT), "Review Notes") {
+		t.Fatalf("expected fromgpt content, got %s", string(fromGPT))
+	}
+
+	if err := os.WriteFile(filepath.Join(projectPath, "togpt.md"), []byte("## Done\n\nTests passed."), 0o644); err != nil {
+		t.Fatalf("write togpt fixture: %v", err)
+	}
+	_, found, err := srv.handleReadToGPTMessage(context.Background(), nil, ReadToGPTMessageInput{
+		ProjectID: "personal-projects:app",
+	})
+	if err != nil {
+		t.Fatalf("read togpt failed: %v", err)
+	}
+	if found.Status != "found" || !strings.Contains(found.Content, "Tests passed.") {
+		t.Fatalf("expected togpt content, got %+v", found)
+	}
+}

@@ -54,8 +54,10 @@ func TestGuardIsWriteAllowed(t *testing.T) {
 		allowed bool
 	}{
 		{filepath.Join(projectPath, "AGENTS.md"), true},
+		{filepath.Join(projectPath, "fromgpt.md"), true},
 		{filepath.Join(projectPath, ".chatgpt/plan.md"), true},
 		{filepath.Join(projectPath, ".ai/note.md"), true},
+		{filepath.Join(projectPath, "togpt.md"), false},
 		{filepath.Join(projectPath, "src/main.go"), false},
 		{filepath.Join(projectPath, "src/AGENTS.md"), false},
 		{filepath.Join(projectPath, "agents.md"), false},

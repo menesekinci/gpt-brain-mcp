@@ -63,6 +63,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"get_project_tree",
 		"read_project_file",
 		"search_project",
+		"read_togpt_message",
 	} {
 		for _, tool := range tools.Tools {
 			if tool.Name == name && !tool.Annotations.ReadOnlyHint {
@@ -81,6 +82,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"complete_planning_phase",
 		"approve_planning_phase",
 		"finalize_planning_workflow",
+		"append_fromgpt_message",
 	} {
 		for _, tool := range tools.Tools {
 			if tool.Name == name {
@@ -104,6 +106,8 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"complete_planning_phase",
 		"approve_planning_phase",
 		"finalize_planning_workflow",
+		"read_togpt_message",
+		"append_fromgpt_message",
 	} {
 		if !names[want] {
 			t.Fatalf("expected tool %q to be registered", want)

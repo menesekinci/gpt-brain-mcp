@@ -123,6 +123,16 @@ type FinalizePlanningWorkflowInput struct {
 	ImplementationPrompts []workflow.ImplementationPrompt `json:"implementation_prompts" jsonschema:"Implementation prompt slices to write after the workflow is approved"`
 }
 
+type AppendFromGPTMessageInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+	Title     string `json:"title,omitempty" jsonschema:"Optional short title for the message"`
+	Message   string `json:"message" jsonschema:"English markdown message, revision, or follow-up from the planning assistant"`
+}
+
+type ReadToGPTMessageInput struct {
+	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
+}
+
 type RootInfo struct {
 	ID       string `json:"id" jsonschema:"Configured root identifier"`
 	Name     string `json:"name" jsonschema:"Human readable root name"`
@@ -238,6 +248,18 @@ type FinalizePlanningWorkflowOutput struct {
 	ImplementationPrompts []string       `json:"implementation_prompts" jsonschema:"Relative paths of generated implementation prompts"`
 	Status                string         `json:"status" jsonschema:"Workflow status after finalization"`
 	State                 workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
+}
+
+type ReadToGPTMessageOutput struct {
+	Path    string `json:"path" jsonschema:"Relative path read from the project"`
+	Status  string `json:"status" jsonschema:"found or missing"`
+	Content string `json:"content" jsonschema:"Redacted togpt.md content"`
+}
+
+type AppendFromGPTMessageOutput struct {
+	WrittenTo string `json:"written_to" jsonschema:"Relative path of fromgpt.md"`
+	Status    string `json:"status" jsonschema:"created or appended"`
+	Timestamp string `json:"timestamp" jsonschema:"UTC timestamp added to the message"`
 }
 
 // ===== Tool Registration =====
@@ -356,6 +378,18 @@ func (s *Server) registerTools() {
 		Description: "Writes the final master planning dossier and implementation prompts after all planning phases are approved.",
 		Annotations: planningWriteTool("Finalize planning workflow"),
 	}, s.handleFinalizePlanningWorkflow)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "read_togpt_message",
+		Description: "Reads root togpt.md, the timestamped response file written by the downstream implementation agent. Read-only.",
+		Annotations: readOnlyTool("Read togpt.md"),
+	}, s.handleReadToGPTMessage)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "append_fromgpt_message",
+		Description: "Appends a timestamped planning-assistant message to root fromgpt.md for a downstream implementation agent. This tool writes only fromgpt.md.",
+		Annotations: planningWriteTool("Append fromgpt.md"),
+	}, s.handleAppendFromGPTMessage)
 }
 
 func readOnlyTool(title string) *mcp.ToolAnnotations {
@@ -913,4 +947,67 @@ func (s *Server) handleFinalizePlanningWorkflow(ctx context.Context, req *mcp.Ca
 		Status:                result.State.Status,
 		State:                 result.State,
 	})
+}
+
+func (s *Server) handleReadToGPTMessage(ctx context.Context, req *mcp.CallToolRequest, input ReadToGPTMessageInput) (*mcp.CallToolResult, ReadToGPTMessageOutput, error) {
+	if err := s.checkToolRate("read_togpt_message"); err != nil {
+		s.audit("read_togpt_message", input.ProjectID, "togpt.md", "blocked", err.Error(), 0)
+		return errorResult[ReadToGPTMessageOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("read_togpt_message", input.ProjectID, "togpt.md", "blocked", err.Error(), 0)
+		return errorResult[ReadToGPTMessageOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	data, err := fsx.ReadFile(input.ProjectID, "togpt.md", absPath, root, s.guard, s.cfg.Security.MaxFileBytes)
+	if err != nil {
+		if strings.Contains(err.Error(), "file not found") {
+			s.audit("read_togpt_message", input.ProjectID, "togpt.md", "allowed", "missing", 0)
+			return jsonContent(ReadToGPTMessageOutput{Path: "togpt.md", Status: "missing"})
+		}
+		s.audit("read_togpt_message", input.ProjectID, "togpt.md", "blocked", err.Error(), 0)
+		return errorResult[ReadToGPTMessageOutput](fmt.Sprintf("Read blocked: %v", err))
+	}
+	content := string(data)
+	if s.cfg.Security.RedactSecrets {
+		content = fsx.RedactSecrets(content)
+	}
+	s.audit("read_togpt_message", input.ProjectID, "togpt.md", "allowed", "", len(content))
+	return textContent(content, ReadToGPTMessageOutput{Path: "togpt.md", Status: "found", Content: content})
+}
+
+func (s *Server) handleAppendFromGPTMessage(ctx context.Context, req *mcp.CallToolRequest, input AppendFromGPTMessageInput) (*mcp.CallToolResult, AppendFromGPTMessageOutput, error) {
+	if err := s.checkToolRate("append_fromgpt_message"); err != nil {
+		s.audit("append_fromgpt_message", input.ProjectID, "fromgpt.md", "blocked", err.Error(), 0)
+		return errorResult[AppendFromGPTMessageOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("append_fromgpt_message", input.ProjectID, "fromgpt.md", "blocked", err.Error(), 0)
+		return errorResult[AppendFromGPTMessageOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if strings.TrimSpace(input.Message) == "" {
+		return errorResult[AppendFromGPTMessageOutput]("message is required")
+	}
+	ts := time.Now().UTC().Format(time.RFC3339)
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		title = "Planning Assistant Message"
+	}
+	entry := fmt.Sprintf("## %s - %s\n\n%s\n", ts, title, strings.TrimSpace(input.Message))
+	status := "created"
+	existing, err := fsx.ReadFile(input.ProjectID, "fromgpt.md", absPath, root, s.guard, s.cfg.Security.MaxFileBytes)
+	if err == nil && len(strings.TrimSpace(string(existing))) > 0 {
+		entry = strings.TrimRight(string(existing), "\r\n") + "\n\n" + entry
+		status = "appended"
+	} else if err != nil && !strings.Contains(err.Error(), "file not found") {
+		s.audit("append_fromgpt_message", input.ProjectID, "fromgpt.md", "blocked", err.Error(), 0)
+		return errorResult[AppendFromGPTMessageOutput](fmt.Sprintf("Read existing fromgpt.md failed: %v", err))
+	}
+	if err := fsx.WriteFile(input.ProjectID, "fromgpt.md", []byte(entry), absPath, root, s.guard, s.cfg.Security.MaxFileBytes); err != nil {
+		s.audit("append_fromgpt_message", input.ProjectID, "fromgpt.md", "blocked", err.Error(), 0)
+		return errorResult[AppendFromGPTMessageOutput](fmt.Sprintf("Write blocked: %v", err))
+	}
+	s.audit("append_fromgpt_message", input.ProjectID, "fromgpt.md", "allowed", status, len(entry))
+	return jsonContent(AppendFromGPTMessageOutput{WrittenTo: "fromgpt.md", Status: status, Timestamp: ts})
 }

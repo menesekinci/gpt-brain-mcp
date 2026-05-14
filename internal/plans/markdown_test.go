@@ -99,6 +99,7 @@ func TestGenerateImplementationPrompt(t *testing.T) {
 		"You are the implementation agent for this repository.",
 		"Project Brain MCP",
 		".chatgpt/plans/2026-05-14-auth.md",
+		"togpt.md",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected generated prompt to contain %q", want)
@@ -119,6 +120,8 @@ func TestProjectBrainGuideAndAgentsTemplatesAreGeneric(t *testing.T) {
 		"implementation agent",
 		".chatgpt/",
 		".ai/",
+		"fromgpt.md",
+		"togpt.md",
 	} {
 		if !strings.Contains(combined, want) {
 			t.Errorf("expected reusable templates to contain %q", want)
