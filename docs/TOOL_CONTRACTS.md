@@ -194,7 +194,40 @@ Creates or optionally overwrites a project-root `AGENTS.md` explaining the Proje
 
 If `AGENTS.md` already exists and `overwrite` is false, the status is `skipped_existing`.
 
-Freeform planning and implementation-prompt tools are intentionally not exposed. Serious planning must use `start_planning_workflow`, `complete_planning_phase`, explicit approval, and `finalize_planning_workflow`.
+Freeform planning and implementation-prompt tools are intentionally not exposed. Scoped small/medium implementation work may use `create_quick_plan`. Serious planning must use `start_planning_workflow`, `complete_planning_phase`, explicit approval, and `finalize_planning_workflow`.
+
+## `create_quick_plan`
+
+Creates one English short phased implementation plan for small or medium scoped work after project inspection. Use this for bug fixes, small UI changes, endpoint additions, focused refactors, or test additions.
+
+Do not use it for product planning, architecture decisions, migrations, auth/permission changes, billing/payment work, production-critical refactors, or broad multi-module features. Use the full planning workflow instead.
+
+**Input:**
+```json
+{
+  "project_id": "personal-projects:my-app",
+  "task_title": "Fix dashboard empty state",
+  "objective": "Improve the dashboard empty state without changing data loading behavior.",
+  "current_context": "Summary of inspected files, current patterns, and risk areas.",
+  "relevant_files": ["app/dashboard/page.tsx"],
+  "phases": ["P1.1 Inspect current rendering.", "P1.2 Implement the scoped UI change.", "P1.3 Validate checks."],
+  "acceptance_criteria": ["The empty state renders clearly on mobile and desktop."],
+  "tests": ["Run the relevant frontend checks."],
+  "risks": ["Do not alter data fetching behavior."],
+  "notes": "Optional extra context.",
+  "create_implementation_prompt": true
+}
+```
+
+**Output:**
+```json
+{
+  "plan_path": ".chatgpt/quick-plans/20260515-010000-fix-dashboard-empty-state.md",
+  "status": "created",
+  "implementation_prompt_path": ".chatgpt/implementation-prompts/20260515-010000-fix-dashboard-empty-state.md",
+  "mode_guidance": "Use full planning workflow for product planning, architecture, migrations, auth/permissions, billing, or broad multi-module features."
+}
+```
 
 ## `start_planning_workflow`
 

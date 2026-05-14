@@ -18,6 +18,7 @@ const (
 	TypeImplementationPrompt PlanType = "implementation_prompt"
 	TypeKimi                 PlanType = "kimi_prompt"
 	TypeDecision             PlanType = "decision"
+	TypeQuickPlan            PlanType = "quick_plan"
 )
 
 // Generate creates a markdown file with frontmatter.
@@ -40,6 +41,8 @@ func Generate(projectID string, planType PlanType, title string, content string)
 		subdir = "kimi"
 	case TypeDecision:
 		subdir = "decisions"
+	case TypeQuickPlan:
+		subdir = "quick-plans"
 	default:
 		subdir = "notes"
 	}

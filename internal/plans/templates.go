@@ -74,6 +74,63 @@ type ImplementationPromptSpec struct {
 	Notes              string
 }
 
+type QuickPlanSpec struct {
+	TaskTitle          string
+	Objective          string
+	CurrentContext     string
+	RelevantFiles      []string
+	Phases             []string
+	AcceptanceCriteria []string
+	Tests              []string
+	Risks              []string
+	Notes              string
+}
+
+func QuickPlanTemplate(spec QuickPlanSpec) string {
+	return fmt.Sprintf(`# %s
+
+## Objective
+
+%s
+
+## Current Context
+
+%s
+
+## Relevant Files
+
+%s
+
+## Short Phased Plan
+
+%s
+
+## Acceptance Criteria
+
+%s
+
+## Tests / Checks
+
+%s
+
+## Risks
+
+%s
+
+## Notes
+
+%s
+`, fallback(spec.TaskTitle, "Quick implementation plan"),
+		fallback(spec.Objective, "Implement the requested scoped change."),
+		fallback(spec.CurrentContext, "Summarize the inspected project context before implementation."),
+		markdownList(spec.RelevantFiles, "No specific files were provided. Inspect the repository before editing."),
+		markdownList(spec.Phases, "Phase 1: inspect current behavior. Phase 2: implement the scoped change. Phase 3: validate with relevant checks."),
+		markdownList(spec.AcceptanceCriteria, "The scoped objective is complete and relevant checks pass."),
+		markdownList(spec.Tests, "Run the most relevant checks available in the repository."),
+		markdownList(spec.Risks, "No major risks identified."),
+		fallback(spec.Notes, "None."))
+}
+
 // ImplementationPromptTemplate returns an English prompt intended for a downstream implementation agent.
 func ImplementationPromptTemplate(spec ImplementationPromptSpec) string {
 	return fmt.Sprintf(`# %s
@@ -159,6 +216,7 @@ func ProjectBrainGuideTemplate(audience string) string {
 - Discovery uses list, inspect, tree, read, and search tools.
 - Planning artifacts are English markdown files under .chatgpt/ or .ai/.
 - Serious product planning uses the manual-gated planning workflow: start_planning_workflow, complete_planning_phase, user approval, approve_planning_phase, and finalization after all phases are approved.
+- Small or medium scoped implementation work can use create_quick_plan for a single short phased plan, optionally with an implementation prompt.
 - High-quality plans include objective, current understanding, relevant files, data model, feature mechanics, phase breakdown, acceptance criteria, tests, risks, and review standards.
 - Implementation prompts are scoped to one coherent implementation task.
 - The user's intent is converted into an English implementation brief before handoff.

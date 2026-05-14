@@ -73,6 +73,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 	}
 	for _, name := range []string{
 		"bootstrap_project_agents_md",
+		"create_quick_plan",
 		"start_planning_workflow",
 		"complete_planning_phase",
 		"approve_planning_phase",
@@ -93,6 +94,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 	for _, want := range []string{
 		"get_project_brain_guide",
 		"bootstrap_project_agents_md",
+		"create_quick_plan",
 		"start_planning_workflow",
 		"get_planning_workflow_status",
 		"get_current_planning_phase",

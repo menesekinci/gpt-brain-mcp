@@ -11,6 +11,7 @@ The server is intentionally narrow. It can inspect safe project files, search co
 - Exposes a streamable HTTP MCP endpoint at `/mcp`.
 - Lists project folders under configured roots and detects common stacks when signals exist.
 - Inspects project structure, reads safe text files, and searches file contents.
+- Creates quick phased implementation plans under `.chatgpt/quick-plans/` for scoped work.
 - Runs strict manual-gated planning workflows under `.chatgpt/workflows/`.
 - Creates generic implementation prompts under `.chatgpt/implementation-prompts/`.
 - Bootstraps project-root `AGENTS.md` so downstream coding agents understand the workflow.
@@ -88,6 +89,7 @@ project-brain-mcp/
 | `read_project_file` | Read an allowed file |
 | `search_project` | Search file contents |
 | `bootstrap_project_agents_md` | Write a standard project-root `AGENTS.md` |
+| `create_quick_plan` | Write one short phased implementation plan for scoped work |
 | `start_planning_workflow` | Start a strict multi-phase planning workflow |
 | `get_planning_workflow_status` | Read workflow state |
 | `get_current_planning_phase` | Read the active phase contract |
@@ -97,7 +99,18 @@ project-brain-mcp/
 | `read_togpt_message` | Read root `togpt.md` written by an implementation agent |
 | `append_fromgpt_message` | Append a timestamped planning-assistant message to root `fromgpt.md` |
 
-## Planning To Implementation Workflow
+## Quick Plan Workflow
+
+For small or medium scoped implementation work, use Quick Plan:
+
+1. Inspect the project with `inspect_project`, `get_project_tree`, `read_project_file`, and `search_project`.
+2. Call `create_quick_plan` with a narrow objective, current context, 3-5 phases, acceptance criteria, tests, and risks.
+3. Set `create_implementation_prompt` to true when you also need a downstream implementation-agent brief.
+4. Give the generated implementation prompt to your chosen implementation agent from the target project root.
+
+Quick Plan is intended for bug fixes, UI adjustments, small endpoint additions, focused refactors, and test additions. Use the full workflow for product planning, architecture, migrations, auth/permission changes, billing/payment work, production-critical refactors, or broad multi-module features.
+
+## Full Planning Workflow
 
 For serious product planning, use the staged workflow instead of one large answer:
 

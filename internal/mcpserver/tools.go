@@ -92,6 +92,20 @@ type CreateImplementationPromptInput struct {
 
 type CreateKimiPromptInput = CreateImplementationPromptInput
 
+type CreateQuickPlanInput struct {
+	ProjectID                  string   `json:"project_id" jsonschema:"Project identifier"`
+	TaskTitle                  string   `json:"task_title" jsonschema:"Short task title for the quick plan"`
+	Objective                  string   `json:"objective" jsonschema:"Scoped implementation objective. Use full planning workflow instead for product/architecture/migration work."`
+	CurrentContext             string   `json:"current_context" jsonschema:"Summary of inspected project context and existing patterns"`
+	RelevantFiles              []string `json:"relevant_files,omitempty" jsonschema:"Relevant files or directories discovered during inspection"`
+	Phases                     []string `json:"phases,omitempty" jsonschema:"Three to five short implementation phases"`
+	AcceptanceCriteria         []string `json:"acceptance_criteria,omitempty" jsonschema:"Acceptance criteria for the scoped change"`
+	Tests                      []string `json:"tests,omitempty" jsonschema:"Tests or checks to run"`
+	Risks                      []string `json:"risks,omitempty" jsonschema:"Risks or edge cases"`
+	Notes                      string   `json:"notes,omitempty" jsonschema:"Optional extra notes"`
+	CreateImplementationPrompt bool     `json:"create_implementation_prompt,omitempty" jsonschema:"Whether to also create an implementation prompt for this quick plan"`
+}
+
 type StartPlanningWorkflowInput struct {
 	ProjectID          string `json:"project_id" jsonschema:"Project identifier"`
 	Title              string `json:"title" jsonschema:"Short title for this planning workflow"`
@@ -201,6 +215,13 @@ type ImplementationPromptOutput struct {
 }
 
 type KimiPromptOutput = ImplementationPromptOutput
+
+type QuickPlanOutput struct {
+	PlanPath                 string `json:"plan_path" jsonschema:"Relative path of the quick plan markdown file"`
+	Status                   string `json:"status" jsonschema:"Write status"`
+	ImplementationPromptPath string `json:"implementation_prompt_path,omitempty" jsonschema:"Relative path of the optional implementation prompt"`
+	ModeGuidance             string `json:"mode_guidance" jsonschema:"Guidance for when to use full workflow instead"`
+}
 
 type StartPlanningWorkflowOutput struct {
 	SessionID      string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
@@ -312,6 +333,12 @@ func (s *Server) registerTools() {
 		Description: "Use this once per project to create a standard English project-root AGENTS.md explaining the Project Brain MCP workflow to downstream implementation agents. This tool writes only AGENTS.md and does not modify source code.",
 		Annotations: planningWriteTool("Bootstrap AGENTS.md"),
 	}, s.handleBootstrapProjectAgentsMD)
+
+	mcp.AddTool(s.mcpServer, &mcp.Tool{
+		Name:        "create_quick_plan",
+		Description: "Creates one short phased implementation plan for small or medium scoped work after project inspection. Do not use for product planning, architecture, migrations, auth/permissions, billing, or broad multi-module features; use start_planning_workflow instead.",
+		Annotations: planningWriteTool("Create quick plan"),
+	}, s.handleCreateQuickPlan)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "start_planning_workflow",
@@ -695,6 +722,71 @@ func (s *Server) handleBootstrapProjectAgentsMD(ctx context.Context, req *mcp.Ca
 		NextSteps: "Reference AGENTS.md in implementation prompts so downstream agents understand the Project Brain MCP planning workflow.",
 	}
 	s.audit("bootstrap_project_agents_md", input.ProjectID, relPath, "allowed", "", len(data))
+	return jsonContent(out)
+}
+
+func (s *Server) handleCreateQuickPlan(ctx context.Context, req *mcp.CallToolRequest, input CreateQuickPlanInput) (*mcp.CallToolResult, QuickPlanOutput, error) {
+	if err := s.checkToolRate("create_quick_plan"); err != nil {
+		s.audit("create_quick_plan", input.ProjectID, "", "blocked", err.Error(), 0)
+		return errorResult[QuickPlanOutput](err.Error())
+	}
+	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
+	if err != nil {
+		s.audit("create_quick_plan", input.ProjectID, "", "blocked", err.Error(), 0)
+		return errorResult[QuickPlanOutput](fmt.Sprintf("Invalid project: %v", err))
+	}
+	if root.ReadOnly {
+		s.audit("create_quick_plan", input.ProjectID, "", "blocked", "root is read-only", 0)
+		return errorResult[QuickPlanOutput]("Quick plan writes are blocked because this root is read-only")
+	}
+	if strings.TrimSpace(input.Objective) == "" {
+		return errorResult[QuickPlanOutput]("objective is required")
+	}
+	content := plans.QuickPlanTemplate(plans.QuickPlanSpec{
+		TaskTitle:          input.TaskTitle,
+		Objective:          input.Objective,
+		CurrentContext:     input.CurrentContext,
+		RelevantFiles:      input.RelevantFiles,
+		Phases:             input.Phases,
+		AcceptanceCriteria: input.AcceptanceCriteria,
+		Tests:              input.Tests,
+		Risks:              input.Risks,
+		Notes:              input.Notes,
+	})
+	planPath, planData, err := plans.Generate(input.ProjectID, plans.TypeQuickPlan, input.TaskTitle, content)
+	if err != nil {
+		s.audit("create_quick_plan", input.ProjectID, "", "error", err.Error(), 0)
+		return errorResult[QuickPlanOutput](fmt.Sprintf("Generation failed: %v", err))
+	}
+	if err := fsx.WriteFile(input.ProjectID, planPath, planData, absPath, root, s.guard, s.cfg.Security.MaxFileBytes); err != nil {
+		s.audit("create_quick_plan", input.ProjectID, planPath, "blocked", err.Error(), 0)
+		return errorResult[QuickPlanOutput](fmt.Sprintf("Write blocked: %v", err))
+	}
+	out := QuickPlanOutput{
+		PlanPath:     planPath,
+		Status:       "created",
+		ModeGuidance: "Use full planning workflow for product planning, architecture, migrations, auth/permissions, billing, or broad multi-module features.",
+	}
+	if input.CreateImplementationPrompt {
+		promptContent := plans.ImplementationPromptTemplate(plans.ImplementationPromptSpec{
+			TaskTitle:          input.TaskTitle,
+			Objective:          input.Objective,
+			PlanPath:           planPath,
+			ContextFiles:       input.RelevantFiles,
+			Constraints:        []string{"Keep the change scoped to the quick plan."},
+			AcceptanceCriteria: input.AcceptanceCriteria,
+			Notes:              input.Notes,
+		})
+		promptPath, promptData, err := plans.Generate(input.ProjectID, plans.TypeImplementationPrompt, input.TaskTitle, promptContent)
+		if err != nil {
+			return errorResult[QuickPlanOutput](fmt.Sprintf("Implementation prompt generation failed: %v", err))
+		}
+		if err := fsx.WriteFile(input.ProjectID, promptPath, promptData, absPath, root, s.guard, s.cfg.Security.MaxFileBytes); err != nil {
+			return errorResult[QuickPlanOutput](fmt.Sprintf("Implementation prompt write blocked: %v", err))
+		}
+		out.ImplementationPromptPath = promptPath
+	}
+	s.audit("create_quick_plan", input.ProjectID, planPath, "allowed", "", len(planData))
 	return jsonContent(out)
 }
 

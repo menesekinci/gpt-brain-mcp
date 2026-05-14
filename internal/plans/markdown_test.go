@@ -107,6 +107,44 @@ func TestGenerateImplementationPrompt(t *testing.T) {
 	}
 }
 
+func TestGenerateQuickPlan(t *testing.T) {
+	content := QuickPlanTemplate(QuickPlanSpec{
+		TaskTitle:      "Fix Dashboard Empty State",
+		Objective:      "Improve the dashboard empty state without changing data loading behavior.",
+		CurrentContext: "The dashboard view already has a loading branch and an empty branch.",
+		RelevantFiles:  []string{"app/dashboard/page.tsx"},
+		Phases: []string{
+			"P1.1 Inspect the current dashboard empty state.",
+			"P1.2 Implement the scoped UI change.",
+			"P1.3 Validate responsive rendering and tests.",
+		},
+		AcceptanceCriteria: []string{"The empty state renders clearly on mobile and desktop."},
+		Tests:              []string{"Run the relevant frontend checks."},
+		Risks:              []string{"Avoid changing data fetching semantics."},
+	})
+
+	relPath, data, err := Generate("root:my-app", TypeQuickPlan, "Fix Dashboard Empty State", content)
+	if err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+	if !strings.HasPrefix(relPath, ".chatgpt/quick-plans/") {
+		t.Errorf("expected path under .chatgpt/quick-plans/, got %q", relPath)
+	}
+
+	body := string(data)
+	for _, want := range []string{
+		"type: quick_plan",
+		"## Current Context",
+		"## Short Phased Plan",
+		"## Acceptance Criteria",
+		"app/dashboard/page.tsx",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected generated quick plan to contain %q", want)
+		}
+	}
+}
+
 func TestProjectBrainGuideAndAgentsTemplatesAreGeneric(t *testing.T) {
 	combined := ProjectBrainGuideTemplate("both") + "\n" + ProjectAgentsTemplate()
 	for _, banned := range []string{"Kimi", "GPT 5.5", "Code CLI"} {

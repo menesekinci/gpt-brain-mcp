@@ -77,11 +77,11 @@ Use Project Brain. List my project roots.
 ```
 
 ```text
-Use Project Brain. Inspect project "personal-projects:my-app", then create an English implementation plan under .chatgpt/plans.
+Use Project Brain. Inspect project "personal-projects:my-app", then create a quick phased implementation plan for this scoped bug fix with create_quick_plan.
 ```
 
 ```text
-Use Project Brain. Create an implementation prompt for this plan with create_implementation_prompt.
+Use Project Brain. Start a full planning workflow for this product idea. Produce only the current phase and wait for my approval before continuing.
 ```
 
 For this local setup, Project Brain is intentionally limited to `~/Projects`. Use the `personal-projects` root and the project folder name under `C:\Users\muham\Projects`:

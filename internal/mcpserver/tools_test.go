@@ -133,6 +133,53 @@ func TestCreateImplementationPrompt(t *testing.T) {
 	}
 }
 
+func TestCreateQuickPlan(t *testing.T) {
+	root := t.TempDir()
+	projectPath := filepath.Join(root, "app")
+	if err := os.MkdirAll(projectPath, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	srv := newTestServer(t, root)
+
+	_, out, err := srv.handleCreateQuickPlan(context.Background(), nil, CreateQuickPlanInput{
+		ProjectID:                  "personal-projects:app",
+		TaskTitle:                  "Fix Dashboard Empty State",
+		Objective:                  "Improve the dashboard empty state without changing data loading behavior.",
+		CurrentContext:             "The dashboard page already contains loading and empty branches.",
+		RelevantFiles:              []string{"app/dashboard/page.tsx"},
+		Phases:                     []string{"P1.1 Inspect current rendering.", "P1.2 Implement the UI change.", "P1.3 Validate checks."},
+		AcceptanceCriteria:         []string{"The empty state is clear on mobile and desktop."},
+		Tests:                      []string{"Run the relevant frontend checks."},
+		Risks:                      []string{"Do not alter data fetching behavior."},
+		CreateImplementationPrompt: true,
+	})
+	if err != nil {
+		t.Fatalf("create quick plan failed: %v", err)
+	}
+	if out.Status != "created" || !strings.HasPrefix(out.PlanPath, ".chatgpt/quick-plans/") {
+		t.Fatalf("unexpected quick plan output: %+v", out)
+	}
+	if !strings.HasPrefix(out.ImplementationPromptPath, ".chatgpt/implementation-prompts/") {
+		t.Fatalf("expected implementation prompt path, got %+v", out)
+	}
+
+	planData, err := os.ReadFile(filepath.Join(projectPath, filepath.FromSlash(out.PlanPath)))
+	if err != nil {
+		t.Fatalf("read quick plan: %v", err)
+	}
+	if !strings.Contains(string(planData), "## Short Phased Plan") {
+		t.Fatalf("expected quick plan content, got %s", string(planData))
+	}
+
+	promptData, err := os.ReadFile(filepath.Join(projectPath, filepath.FromSlash(out.ImplementationPromptPath)))
+	if err != nil {
+		t.Fatalf("read quick implementation prompt: %v", err)
+	}
+	if !strings.Contains(string(promptData), out.PlanPath) {
+		t.Fatalf("expected implementation prompt to reference quick plan path")
+	}
+}
+
 func TestPlanningWorkflowToolFlow(t *testing.T) {
 	root := t.TempDir()
 	projectPath := filepath.Join(root, "app")
