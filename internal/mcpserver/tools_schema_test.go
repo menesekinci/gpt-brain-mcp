@@ -51,6 +51,24 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		if tool.OutputSchema == nil {
 			t.Fatalf("tool %q has nil output schema", tool.Name)
 		}
+		if tool.Annotations == nil {
+			t.Fatalf("tool %q has nil annotations", tool.Name)
+		}
+	}
+	for _, name := range []string{
+		"get_project_brain_guide",
+		"list_roots",
+		"list_projects",
+		"inspect_project",
+		"get_project_tree",
+		"read_project_file",
+		"search_project",
+	} {
+		for _, tool := range tools.Tools {
+			if tool.Name == name && !tool.Annotations.ReadOnlyHint {
+				t.Fatalf("tool %q should be marked read-only", name)
+			}
+		}
 	}
 	for _, want := range []string{
 		"get_project_brain_guide",

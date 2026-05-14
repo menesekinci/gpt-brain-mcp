@@ -164,68 +164,101 @@ type KimiPromptOutput = ImplementationPromptOutput
 func (s *Server) registerTools() {
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_project_brain_guide",
-		Description: "Use this when a ChatGPT conversation needs the reusable Project Brain MCP operating guide. Returns English instructions for the planning assistant and/or downstream implementation agents. This tool does not read project files or write anything.",
+		Description: "Returns a neutral English context summary for Project Brain MCP. Read-only. Does not read project files, write files, or execute commands.",
+		Annotations: readOnlyTool("Project Brain guide"),
 	}, s.handleGetProjectBrainGuide)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "list_roots",
 		Description: "Lists configured project roots that this MCP server is allowed to access.",
+		Annotations: readOnlyTool("List roots"),
 	}, s.handleListRoots)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "list_projects",
 		Description: "Lists software projects under a configured root. Does not read file contents.",
+		Annotations: readOnlyTool("List projects"),
 	}, s.handleListProjects)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "inspect_project",
 		Description: "Returns a structured read-only overview of a selected project, including detected stack, important files, manifest summaries, and warnings.",
+		Annotations: readOnlyTool("Inspect project"),
 	}, s.handleInspectProject)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "get_project_tree",
 		Description: "Returns a filtered file tree for a project, respecting ignore rules and depth limits.",
+		Annotations: readOnlyTool("Get project tree"),
 	}, s.handleGetProjectTree)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "read_project_file",
 		Description: "Reads the contents of a single allowed file from a project. Binary files, secrets, and oversized files are rejected.",
+		Annotations: readOnlyTool("Read project file"),
 	}, s.handleReadProjectFile)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "search_project",
 		Description: "Searches for a query string across text files in a project. Returns matching lines with file paths and line numbers.",
+		Annotations: readOnlyTool("Search project"),
 	}, s.handleSearchProject)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "create_project_analysis_note",
 		Description: "Creates a markdown analysis note inside the selected project's .chatgpt/analysis directory. This tool cannot write outside the configured planning directories.",
+		Annotations: planningWriteTool("Create analysis note"),
 	}, s.handleCreateAnalysisNote)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "create_agent_plan",
 		Description: "Creates a markdown implementation plan inside the selected project's .chatgpt/plans directory. This tool cannot write outside the configured planning directories.",
+		Annotations: planningWriteTool("Create agent plan"),
 	}, s.handleCreateAgentPlan)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "create_agent_handoff",
 		Description: "Creates a markdown handoff file inside the selected project's .chatgpt/handoffs directory for an external coding agent. This tool cannot write outside the configured planning directories.",
+		Annotations: planningWriteTool("Create agent handoff"),
 	}, s.handleCreateAgentHandoff)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "bootstrap_project_agents_md",
 		Description: "Use this once per project to create a standard English project-root AGENTS.md explaining the Project Brain MCP workflow to downstream implementation agents. This tool writes only AGENTS.md and does not modify source code.",
+		Annotations: planningWriteTool("Bootstrap AGENTS.md"),
 	}, s.handleBootstrapProjectAgentsMD)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "create_implementation_prompt",
 		Description: "Use this when ChatGPT has planned a coding task and needs to hand implementation to a downstream implementation agent. Creates an English markdown prompt under .chatgpt/implementation-prompts. This tool does not execute agents or modify source files.",
+		Annotations: planningWriteTool("Create implementation prompt"),
 	}, s.handleCreateImplementationPrompt)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "create_kimi_prompt",
 		Description: "Compatibility alias for older workflows. Prefer create_implementation_prompt for new tasks. Creates a generic English implementation prompt without assuming a specific implementation agent, model, IDE, or CLI.",
+		Annotations: planningWriteTool("Create implementation prompt"),
 	}, s.handleCreateKimiPrompt)
+}
+
+func readOnlyTool(title string) *mcp.ToolAnnotations {
+	openWorld := false
+	return &mcp.ToolAnnotations{
+		Title:         title,
+		ReadOnlyHint:  true,
+		OpenWorldHint: &openWorld,
+	}
+}
+
+func planningWriteTool(title string) *mcp.ToolAnnotations {
+	destructive := false
+	openWorld := false
+	return &mcp.ToolAnnotations{
+		Title:           title,
+		ReadOnlyHint:    false,
+		DestructiveHint: &destructive,
+		OpenWorldHint:   &openWorld,
+	}
 }
 
 // ===== Handlers =====
@@ -237,10 +270,10 @@ func (s *Server) handleGetProjectBrainGuide(ctx context.Context, req *mcp.CallTo
 	}
 	guide := plans.ProjectBrainGuideTemplate(input.Audience)
 	out := ProjectBrainGuideOutput{
-		Title:            "Project Brain MCP Operating Guide",
-		Version:          "1.0",
+		Title:            "Project Brain MCP Context Summary",
+		Version:          "1.1",
 		Guide:            guide,
-		RecommendedUsage: "Paste or reference this guide at the start of normal ChatGPT conversations that should use Project Brain MCP as the project planning and handoff context.",
+		RecommendedUsage: "Use this read-only context summary as background when discussing Project Brain MCP workflows.",
 	}
 	s.audit("get_project_brain_guide", "", "", "allowed", "", len(guide))
 	return jsonContent(out)

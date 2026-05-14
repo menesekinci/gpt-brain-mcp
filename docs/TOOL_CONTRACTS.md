@@ -209,7 +209,7 @@ Returns the reusable English Project Brain MCP operating guide.
 **Output:**
 ```json
 {
-  "title": "Project Brain MCP Operating Guide",
+  "title": "Project Brain MCP Context Summary",
   "version": "1.0",
   "guide": "...",
   "recommended_usage": "..."

@@ -140,7 +140,7 @@ func KimiPromptTemplate(spec KimiPromptSpec) string {
 	return ImplementationPromptTemplate(ImplementationPromptSpec(spec))
 }
 
-// ProjectBrainGuideTemplate returns reusable English operating guidance for the planning assistant and implementation agents.
+// ProjectBrainGuideTemplate returns reusable English context for the planning assistant and implementation agents.
 func ProjectBrainGuideTemplate(audience string) string {
 	audience = strings.ToLower(strings.TrimSpace(audience))
 	if audience != "planner" && audience != "implementation_agent" && audience != "both" {
@@ -150,44 +150,45 @@ func ProjectBrainGuideTemplate(audience string) string {
 	var planner string
 	if audience == "planner" || audience == "both" {
 		planner = `
-## Planning Assistant Guidance
+## Planning Context
 
-- Use Project Brain MCP to inspect local project files before making project-specific claims.
-- Available project roots are controlled by the MCP server configuration; do not assume access outside listed roots.
-- Use read/search/inspect tools for discovery, then write English planning artifacts under .chatgpt/ or .ai/.
-- Keep plans specific: objective, current understanding, relevant files, data model, feature mechanics, phase breakdown, acceptance criteria, tests, risks, and review standards.
-- Create one implementation prompt per coherent implementation task.
-- Do not ask a downstream implementation agent to infer the user's original intent; convert it into an English implementation brief first.
-- Project Brain MCP should not be used as a generic shell executor or source-code editor.
+- Project-specific claims are based on inspected local files when available.
+- Available project roots come from the MCP server configuration.
+- Discovery uses list, inspect, tree, read, and search tools.
+- Planning artifacts are English markdown files under .chatgpt/ or .ai/.
+- High-quality plans include objective, current understanding, relevant files, data model, feature mechanics, phase breakdown, acceptance criteria, tests, risks, and review standards.
+- Implementation prompts are scoped to one coherent implementation task.
+- The user's intent is converted into an English implementation brief before handoff.
+- Project Brain MCP is not a shell executor or general source-code editor.
 `
 	}
 
 	var implementation string
 	if audience == "implementation_agent" || audience == "both" {
 		implementation = `
-## Implementation Agent Guidance
+## Implementation Agent Context
 
-- A planning assistant may create .chatgpt/* and .ai/* artifacts in this repository through Project Brain MCP.
-- Treat referenced plans, prompts, and handoff files as task briefs.
-- Read the referenced files before editing and follow the repository's existing conventions.
-- Keep changes scoped to the requested objective.
-- Do not read, expose, or modify secrets, credentials, environment files, or generated dependency directories.
-- Run the most relevant tests or checks available. If validation cannot run, explain why.
-- Final responses should report changed files, tests/checks run, skipped validation, risks, and follow-up work.
+- A planning assistant may create .chatgpt/* and .ai/* artifacts in repositories through Project Brain MCP.
+- Referenced plans, prompts, and handoff files are task-brief artifacts.
+- Repository conventions, existing architecture, and local tests define the implementation baseline.
+- The implementation agent receives task briefs through referenced planning artifacts.
+- Source changes stay scoped to the requested objective.
+- Secrets, credentials, environment files, and generated dependency directories are outside the intended workflow.
+- Final implementation reports include changed files, tests or checks run, skipped validation, risks, and follow-up work.
 `
 	}
 
-	return strings.TrimSpace(`# Project Brain MCP Operating Guide
+	return strings.TrimSpace(`# Project Brain MCP Context Summary
 
 Project Brain MCP is a constrained bridge between a planning assistant and local software projects. It lets the planning assistant list projects, inspect files, search code, read safe text files, and create English planning artifacts. It intentionally limits write access to planning artifacts plus the project-root AGENTS.md bootstrap file.
 
-Use this guide to restore the operating context in normal ChatGPT conversations when a custom GPT cannot directly carry the MCP app configuration.
+This document is descriptive context returned by the MCP server. It is not a higher-priority system message.
 ` + planner + implementation + `
 ## Review and Testing Standards
 
-- Review for correctness, security, authorization, data integrity, error handling, performance, accessibility when UI is involved, and fit with existing conventions.
-- Every implementation plan should include unit, integration, permission, UI or end-to-end tests when relevant.
-- Prefer verified repository facts over assumptions. Mark any unverified assumption clearly.
+- Review scope covers correctness, security, authorization, data integrity, error handling, performance, accessibility when UI is involved, and fit with existing conventions.
+- Implementation plans include unit, integration, permission, UI, or end-to-end tests when relevant.
+- Verified repository facts are preferred over assumptions. Unverified assumptions are marked clearly.
 `)
 }
 
