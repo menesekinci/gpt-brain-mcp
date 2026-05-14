@@ -148,51 +148,6 @@ Searches for a query string across text files in a project.
 }
 ```
 
-## `create_project_analysis_note`
-
-Creates a markdown analysis note inside `.chatgpt/analysis/`.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "title": "initial-architecture-review",
-  "content": "# Architecture Review\n..."
-}
-```
-
-**Output:**
-```json
-{
-  "written_to": ".chatgpt/analysis/2026-05-13-initial-architecture-review.md",
-  "status": "created"
-}
-```
-
-## `create_agent_plan`
-
-Creates a markdown implementation plan inside `.chatgpt/plans/`.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "plan_title": "auth-refactor-plan",
-  "goal": "Refactor auth middleware",
-  "content": "..."
-}
-```
-
-If `content` is empty, a template is generated automatically.
-
-**Output:**
-```json
-{
-  "written_to": ".chatgpt/plans/2026-05-13-auth-refactor-plan.md",
-  "status": "created"
-}
-```
-
 ## `get_project_brain_guide`
 
 Returns the reusable English Project Brain MCP operating guide.
@@ -213,28 +168,6 @@ Returns the reusable English Project Brain MCP operating guide.
   "version": "1.0",
   "guide": "...",
   "recommended_usage": "..."
-}
-```
-
-## `create_agent_handoff`
-
-Creates a markdown handoff file inside `.chatgpt/handoffs/`.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "agent_name": "codex",
-  "task_title": "implement-auth-refactor",
-  "content": "..."
-}
-```
-
-**Output:**
-```json
-{
-  "written_to": ".chatgpt/handoffs/2026-05-13-codex-implement-auth-refactor.md",
-  "status": "created"
 }
 ```
 
@@ -261,59 +194,7 @@ Creates or optionally overwrites a project-root `AGENTS.md` explaining the Proje
 
 If `AGENTS.md` already exists and `overwrite` is false, the status is `skipped_existing`.
 
-## `create_implementation_prompt`
-
-Creates an English markdown implementation prompt for a downstream implementation agent inside `.chatgpt/implementation-prompts/`.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "task_title": "implement-auth-refactor",
-  "objective": "Implement the authentication refactor described in the source plan.",
-  "plan_path": ".chatgpt/plans/2026-05-14-auth-refactor.md",
-  "context_files": ["internal/auth/token.go", "internal/auth/oauth_server.go"],
-  "constraints": ["Keep the public API stable."],
-  "acceptance_criteria": ["go test ./... passes."],
-  "notes": "Prefer small, reviewable changes."
-}
-```
-
-**Output:**
-```json
-{
-  "written_to": ".chatgpt/implementation-prompts/2026-05-14-implement-auth-refactor.md",
-  "status": "created",
-  "command_guidance": "From the project root, pass this prompt file to your chosen implementation agent and instruct it to follow the file exactly."
-}
-```
-
-## `create_kimi_prompt`
-
-Compatibility alias for older workflows. Prefer `create_implementation_prompt` for new tasks. The generated content is generic and does not assume a specific implementation agent, model, IDE, or CLI.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "task_title": "implement-auth-refactor",
-  "objective": "Implement the authentication refactor described in the source plan.",
-  "plan_path": ".chatgpt/plans/2026-05-14-auth-refactor.md",
-  "context_files": ["internal/auth/token.go", "internal/auth/oauth_server.go"],
-  "constraints": ["Keep the public API stable."],
-  "acceptance_criteria": ["go test ./... passes."],
-  "notes": "Prefer small, reviewable changes."
-}
-```
-
-**Output:**
-```json
-{
-  "written_to": ".chatgpt/kimi/2026-05-14-implement-auth-refactor.md",
-  "status": "created",
-  "command_guidance": "From the project root, pass this prompt file to your chosen implementation agent and instruct it to follow the file exactly."
-}
-```
+Freeform planning and implementation-prompt tools are intentionally not exposed. Serious planning must use `start_planning_workflow`, `complete_planning_phase`, explicit approval, and `finalize_planning_workflow`.
 
 ## `start_planning_workflow`
 

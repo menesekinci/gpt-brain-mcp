@@ -72,12 +72,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		}
 	}
 	for _, name := range []string{
-		"create_project_analysis_note",
-		"create_agent_plan",
-		"create_agent_handoff",
 		"bootstrap_project_agents_md",
-		"create_implementation_prompt",
-		"create_kimi_prompt",
 		"start_planning_workflow",
 		"complete_planning_phase",
 		"approve_planning_phase",
@@ -98,8 +93,6 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 	for _, want := range []string{
 		"get_project_brain_guide",
 		"bootstrap_project_agents_md",
-		"create_implementation_prompt",
-		"create_kimi_prompt",
 		"start_planning_workflow",
 		"get_planning_workflow_status",
 		"get_current_planning_phase",
@@ -111,6 +104,17 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 	} {
 		if !names[want] {
 			t.Fatalf("expected tool %q to be registered", want)
+		}
+	}
+	for _, removed := range []string{
+		"create_project_analysis_note",
+		"create_agent_plan",
+		"create_agent_handoff",
+		"create_implementation_prompt",
+		"create_kimi_prompt",
+	} {
+		if names[removed] {
+			t.Fatalf("legacy freeform planning tool %q should not be registered", removed)
 		}
 	}
 }

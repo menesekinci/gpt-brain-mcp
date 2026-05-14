@@ -11,7 +11,6 @@ The server is intentionally narrow. It can inspect safe project files, search co
 - Exposes a streamable HTTP MCP endpoint at `/mcp`.
 - Lists project folders under configured roots and detects common stacks when signals exist.
 - Inspects project structure, reads safe text files, and searches file contents.
-- Writes English planning artifacts under `.chatgpt/` or `.ai/`.
 - Runs strict manual-gated planning workflows under `.chatgpt/workflows/`.
 - Creates generic implementation prompts under `.chatgpt/implementation-prompts/`.
 - Bootstraps project-root `AGENTS.md` so downstream coding agents understand the workflow.
@@ -88,12 +87,7 @@ project-brain-mcp/
 | `get_project_tree` | Filtered file tree |
 | `read_project_file` | Read an allowed file |
 | `search_project` | Search file contents |
-| `create_project_analysis_note` | Write markdown to `.chatgpt/analysis/` |
-| `create_agent_plan` | Write markdown to `.chatgpt/plans/` |
-| `create_agent_handoff` | Write markdown to `.chatgpt/handoffs/` |
 | `bootstrap_project_agents_md` | Write a standard project-root `AGENTS.md` |
-| `create_implementation_prompt` | Write an English generic implementation prompt to `.chatgpt/implementation-prompts/` |
-| `create_kimi_prompt` | Legacy compatibility alias for older saved tool snapshots |
 | `start_planning_workflow` | Start a strict multi-phase planning workflow |
 | `get_planning_workflow_status` | Read workflow state |
 | `get_current_planning_phase` | Read the active phase contract |
@@ -119,7 +113,7 @@ For serious product planning, use the staged workflow instead of one large answe
 <agent-command> < ".chatgpt/implementation-prompts/<prompt-file>.md"
 ```
 
-Implementation happens outside the MCP server in the implementation agent's own runtime and approval model.
+Implementation happens outside the MCP server in the implementation agent's own runtime and approval model. Freeform planning and prompt tools are intentionally not exposed; serious planning must go through the workflow gate.
 
 Implementation agents should read `fromgpt.md` before working and write `togpt.md` after each assigned task. Project Brain can read `togpt.md` and append timestamped follow-up messages to `fromgpt.md`.
 

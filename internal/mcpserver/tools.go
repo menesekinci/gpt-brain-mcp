@@ -308,40 +308,10 @@ func (s *Server) registerTools() {
 	}, s.handleSearchProject)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "create_project_analysis_note",
-		Description: "Creates a markdown analysis note inside the selected project's .chatgpt/analysis directory. This tool cannot write outside the configured planning directories.",
-		Annotations: planningWriteTool("Create analysis note"),
-	}, s.handleCreateAnalysisNote)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "create_agent_plan",
-		Description: "Creates a markdown implementation plan inside the selected project's .chatgpt/plans directory. This tool cannot write outside the configured planning directories.",
-		Annotations: planningWriteTool("Create agent plan"),
-	}, s.handleCreateAgentPlan)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "create_agent_handoff",
-		Description: "Creates a markdown handoff file inside the selected project's .chatgpt/handoffs directory for an external coding agent. This tool cannot write outside the configured planning directories.",
-		Annotations: planningWriteTool("Create agent handoff"),
-	}, s.handleCreateAgentHandoff)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "bootstrap_project_agents_md",
 		Description: "Use this once per project to create a standard English project-root AGENTS.md explaining the Project Brain MCP workflow to downstream implementation agents. This tool writes only AGENTS.md and does not modify source code.",
 		Annotations: planningWriteTool("Bootstrap AGENTS.md"),
 	}, s.handleBootstrapProjectAgentsMD)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "create_implementation_prompt",
-		Description: "Use this when ChatGPT has planned a coding task and needs to hand implementation to a downstream implementation agent. Creates an English markdown prompt under .chatgpt/implementation-prompts. This tool does not execute agents or modify source files.",
-		Annotations: planningWriteTool("Create implementation prompt"),
-	}, s.handleCreateImplementationPrompt)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "create_kimi_prompt",
-		Description: "Compatibility alias for older workflows. Prefer create_implementation_prompt for new tasks. Creates a generic English implementation prompt without assuming a specific implementation agent, model, IDE, or CLI.",
-		Annotations: planningWriteTool("Create implementation prompt"),
-	}, s.handleCreateKimiPrompt)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "start_planning_workflow",
