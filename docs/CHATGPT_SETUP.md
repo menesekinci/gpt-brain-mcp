@@ -89,7 +89,7 @@ Use Project Brain. Inspect project "personal-projects:my-app", then create a qui
 ```
 
 ```text
-Use Project Brain. Start a full planning workflow for this product idea. Produce only the current phase and wait for my approval before continuing.
+Use Project Brain. Start a full planning workflow for this product idea. Produce only one phase artifact at a time and continue with the next returned phase.
 ```
 
 For this local setup, Project Brain is intentionally limited to `~/Projects`. Use the `personal-projects` root and the project folder name under `C:\Users\muham\Projects`:

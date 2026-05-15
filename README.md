@@ -12,7 +12,7 @@ The server is intentionally narrow. It can inspect safe project files, search co
 - Lists project folders under configured roots and detects common stacks when signals exist.
 - Inspects project structure, reads safe text files, and searches file contents.
 - Creates quick phased implementation plans under `.chatgpt/quick-plans/` for scoped work.
-- Runs strict manual-gated planning workflows under `.chatgpt/workflows/`.
+- Runs strict automatic staged planning workflows under `.chatgpt/workflows/`.
 - Creates generic implementation prompts under `.chatgpt/implementation-prompts/`.
 - Bootstraps project-root `AGENTS.md` so downstream coding agents understand the workflow.
 - Logs tool calls for auditability.
@@ -101,8 +101,7 @@ project-brain-mcp/
 | `start_planning_workflow` | Start a strict multi-phase planning workflow |
 | `get_planning_workflow_status` | Read workflow state |
 | `get_current_planning_phase` | Read the active phase contract |
-| `complete_planning_phase` | Write the current phase artifact and wait for user approval |
-| `approve_planning_phase` | Advance after explicit user approval |
+| `complete_planning_phase` | Write the current phase artifact and open the next phase |
 | `finalize_planning_workflow` | Write the final dossier and implementation prompts |
 | `read_togpt_message` | Read root `togpt.md` written by an implementation agent |
 | `append_fromgpt_message` | Append a timestamped planning-assistant message to root `fromgpt.md` |
@@ -124,17 +123,16 @@ For serious product planning, use the staged workflow instead of one large answe
 
 1. Start with `start_planning_workflow`.
 2. Complete only the current phase with `complete_planning_phase`.
-3. Review the artifact with the user.
-4. When the user explicitly says to continue, call `approve_planning_phase`.
-5. Repeat until `10-review-test` is approved.
-6. Call `finalize_planning_workflow` to write `final/master-plan.md` and implementation prompts.
-7. Run your chosen implementation agent from the target project root and pass a generated prompt file:
+3. Continue with only the next phase returned by the tool.
+4. Repeat until `10-review-test` is complete.
+5. Call `finalize_planning_workflow` to write `final/master-plan.md` and implementation prompts.
+6. Run your chosen implementation agent from the target project root and pass a generated prompt file:
 
 ```powershell
 <agent-command> < ".chatgpt/implementation-prompts/<prompt-file>.md"
 ```
 
-Implementation happens outside the MCP server in the implementation agent's own runtime and approval model. Freeform planning and prompt tools are intentionally not exposed; serious planning must go through the workflow gate.
+Implementation happens outside the MCP server in the implementation agent's own runtime and approval model. Freeform planning and prompt tools are intentionally not exposed; serious planning must go through the staged workflow.
 
 Implementation agents should read `fromgpt.md` before working and write `togpt.md` after each assigned task. Project Brain can read `togpt.md` and append timestamped follow-up messages to `fromgpt.md`.
 

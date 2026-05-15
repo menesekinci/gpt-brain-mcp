@@ -76,7 +76,6 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"create_quick_plan",
 		"start_planning_workflow",
 		"complete_planning_phase",
-		"approve_planning_phase",
 		"finalize_planning_workflow",
 		"append_fromgpt_message",
 	} {
@@ -99,7 +98,6 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"get_planning_workflow_status",
 		"get_current_planning_phase",
 		"complete_planning_phase",
-		"approve_planning_phase",
 		"finalize_planning_workflow",
 		"read_togpt_message",
 		"append_fromgpt_message",
@@ -114,6 +112,7 @@ func TestRegisteredToolsExposeOutputSchemas(t *testing.T) {
 		"create_agent_handoff",
 		"create_implementation_prompt",
 		"create_kimi_prompt",
+		"approve_planning_phase",
 	} {
 		if names[removed] {
 			t.Fatalf("legacy freeform planning tool %q should not be registered", removed)

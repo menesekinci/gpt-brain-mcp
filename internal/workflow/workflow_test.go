@@ -38,7 +38,7 @@ func TestStartWorkflowCreatesStateAndFirstPhase(t *testing.T) {
 	}
 }
 
-func TestCompletePhaseEnforcesCurrentPhaseAndManualGate(t *testing.T) {
+func TestCompletePhaseEnforcesCurrentPhaseAndOpensNextPhase(t *testing.T) {
 	root := t.TempDir()
 	start, err := Start(root, "personal-projects:app", "Social App", "Build a social app.", fixedTime())
 	if err != nil {
@@ -51,53 +51,29 @@ func TestCompletePhaseEnforcesCurrentPhaseAndManualGate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Complete failed: %v", err)
 	}
-	if result.State.Phases[0].Status != PhaseAwaitingUserApproval {
-		t.Fatalf("expected awaiting approval, got %s", result.State.Phases[0].Status)
+	if result.State.Phases[0].Status != PhaseCompleted {
+		t.Fatalf("expected completed phase, got %s", result.State.Phases[0].Status)
 	}
-	if result.State.CurrentPhase != "01-intent" {
-		t.Fatalf("phase should not advance automatically, got %s", result.State.CurrentPhase)
+	if result.State.CurrentPhase != "02-deep-search" {
+		t.Fatalf("expected next phase to open, got %s", result.State.CurrentPhase)
+	}
+	if result.NextPhase == nil || result.NextPhase.ID != "02-deep-search" {
+		t.Fatalf("expected next phase definition, got %+v", result.NextPhase)
 	}
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(result.WrittenTo))); err != nil {
 		t.Fatalf("expected artifact to exist: %v", err)
 	}
 }
 
-func TestApprovePhaseOpensNextPhase(t *testing.T) {
-	root := t.TempDir()
-	start, _ := Start(root, "personal-projects:app", "Social App", "Build a social app.", fixedTime())
-	if _, err := Approve(root, start.State.SessionID, "01-intent", fixedTime()); err == nil {
-		t.Fatal("expected approve before completion to fail")
-	}
-	if _, err := Complete(root, start.State.SessionID, "01-intent", "# Intent", fixedTime()); err != nil {
-		t.Fatalf("Complete failed: %v", err)
-	}
-	result, err := Approve(root, start.State.SessionID, "01-intent", fixedTime())
-	if err != nil {
-		t.Fatalf("Approve failed: %v", err)
-	}
-	if result.State.Phases[0].Status != PhaseApproved {
-		t.Fatalf("expected first phase approved, got %s", result.State.Phases[0].Status)
-	}
-	if result.State.CurrentPhase != "02-deep-search" {
-		t.Fatalf("expected next phase open, got %s", result.State.CurrentPhase)
-	}
-	if result.NextPhase == nil || result.NextPhase.ID != "02-deep-search" {
-		t.Fatalf("expected next phase definition, got %+v", result.NextPhase)
-	}
-}
-
-func TestFinalizeRequiresAllPhasesApproved(t *testing.T) {
+func TestFinalizeRequiresAllPhasesComplete(t *testing.T) {
 	root := t.TempDir()
 	start, _ := Start(root, "personal-projects:app", "Social App", "Build a social app.", fixedTime())
 	if _, err := Finalize(root, start.State.SessionID, "# Master", nil, fixedTime()); err == nil {
-		t.Fatal("expected finalize before approvals to fail")
+		t.Fatal("expected finalize before all phases complete to fail")
 	}
 	for _, phase := range Phases() {
 		if _, err := Complete(root, start.State.SessionID, phase.ID, "# "+phase.Title, fixedTime()); err != nil {
 			t.Fatalf("Complete %s failed: %v", phase.ID, err)
-		}
-		if _, err := Approve(root, start.State.SessionID, phase.ID, fixedTime()); err != nil {
-			t.Fatalf("Approve %s failed: %v", phase.ID, err)
 		}
 	}
 	result, err := Finalize(root, start.State.SessionID, "# Master Plan", []ImplementationPrompt{{

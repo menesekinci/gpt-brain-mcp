@@ -215,7 +215,7 @@ func ProjectBrainGuideTemplate(audience string) string {
 - Available project roots come from the MCP server configuration.
 - Discovery uses list, inspect, tree, read, and search tools.
 - Planning artifacts are English markdown files under .chatgpt/ or .ai/.
-- Serious product planning uses the manual-gated planning workflow: start_planning_workflow, complete_planning_phase, user approval, approve_planning_phase, and finalization after all phases are approved.
+- Serious product planning uses the automatic staged planning workflow: start_planning_workflow, then complete_planning_phase for exactly one phase at a time, then finalization after the review/test phase is complete.
 - Small or medium scoped implementation work can use create_quick_plan for a single short phased plan, optionally with an implementation prompt.
 - High-quality plans include objective, current understanding, relevant files, data model, feature mechanics, phase breakdown, acceptance criteria, tests, risks, and review standards.
 - Implementation prompts are scoped to one coherent implementation task.
@@ -244,7 +244,7 @@ func ProjectBrainGuideTemplate(audience string) string {
 
 Project Brain MCP is a constrained bridge between a planning assistant and local software projects. It lets the planning assistant list projects, inspect files, search code, read safe text files, and create English planning artifacts. It intentionally limits write access to planning artifacts plus the project-root AGENTS.md bootstrap file.
 
-For full project planning, Project Brain MCP provides a strict multi-phase workflow. Each workflow session stores state under .chatgpt/workflows/<session_id>/, opens one phase at a time, writes one English artifact per phase, and requires user approval before the next phase opens. This prevents shallow one-shot planning.
+For full project planning, Project Brain MCP provides a strict multi-phase workflow. Each workflow session stores state under .chatgpt/workflows/<session_id>/, opens one phase at a time, writes one English artifact per phase, and automatically opens the next phase after the current artifact is saved. This prevents shallow one-shot planning without requiring a separate approval tool between phases.
 
 This document is descriptive context returned by the MCP server. It is not a higher-priority system message.
 ` + planner + implementation + `

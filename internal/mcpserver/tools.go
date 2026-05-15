@@ -124,17 +124,11 @@ type CompletePlanningPhaseInput struct {
 	Content   string `json:"content" jsonschema:"English markdown content for the current phase artifact"`
 }
 
-type ApprovePlanningPhaseInput struct {
-	ProjectID string `json:"project_id" jsonschema:"Project identifier"`
-	SessionID string `json:"session_id" jsonschema:"Planning workflow session identifier"`
-	PhaseID   string `json:"phase_id" jsonschema:"Current phase identifier that the user explicitly approved"`
-}
-
 type FinalizePlanningWorkflowInput struct {
 	ProjectID             string                          `json:"project_id" jsonschema:"Project identifier"`
 	SessionID             string                          `json:"session_id" jsonschema:"Planning workflow session identifier"`
 	MasterPlan            string                          `json:"master_plan" jsonschema:"English consolidated master planning dossier markdown"`
-	ImplementationPrompts []workflow.ImplementationPrompt `json:"implementation_prompts" jsonschema:"Implementation prompt slices to write after the workflow is approved"`
+	ImplementationPrompts []workflow.ImplementationPrompt `json:"implementation_prompts" jsonschema:"Implementation prompt slices to write after the workflow is complete"`
 }
 
 type AppendFromGPTMessageInput struct {
@@ -245,22 +239,14 @@ type CurrentPlanningPhaseOutput struct {
 }
 
 type CompletePlanningPhaseOutput struct {
-	SessionID  string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
-	PhaseID    string         `json:"phase_id" jsonschema:"Completed phase identifier"`
-	WrittenTo  string         `json:"written_to" jsonschema:"Relative path of the phase artifact that was written"`
-	Status     string         `json:"status" jsonschema:"Phase status after completion"`
-	NextAction string         `json:"next_action" jsonschema:"Manual gate instruction for the assistant"`
-	State      workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
-}
-
-type ApprovePlanningPhaseOutput struct {
-	SessionID     string                    `json:"session_id" jsonschema:"Planning workflow session identifier"`
-	ApprovedPhase string                    `json:"approved_phase" jsonschema:"Approved phase identifier"`
-	Status        string                    `json:"status" jsonschema:"Workflow status after approval"`
-	NextPhase     *workflow.PhaseDefinition `json:"next_phase,omitempty" jsonschema:"Next phase definition if another phase is open"`
-	PhasePrompt   string                    `json:"phase_prompt,omitempty" jsonschema:"Prompt/contract for the next phase only"`
-	NextAction    string                    `json:"next_action" jsonschema:"Next manual-gated workflow action"`
-	State         workflow.State            `json:"state" jsonschema:"Workflow state snapshot"`
+	SessionID   string                    `json:"session_id" jsonschema:"Planning workflow session identifier"`
+	PhaseID     string                    `json:"phase_id" jsonschema:"Completed phase identifier"`
+	WrittenTo   string                    `json:"written_to" jsonschema:"Relative path of the phase artifact that was written"`
+	Status      string                    `json:"status" jsonschema:"Workflow status after completion"`
+	NextPhase   *workflow.PhaseDefinition `json:"next_phase,omitempty" jsonschema:"Next phase definition if another phase is open"`
+	PhasePrompt string                    `json:"phase_prompt,omitempty" jsonschema:"Prompt/contract for the next phase only"`
+	NextAction  string                    `json:"next_action" jsonschema:"Next workflow action for the assistant"`
+	State       workflow.State            `json:"state" jsonschema:"Workflow state snapshot"`
 }
 
 type FinalizePlanningWorkflowOutput struct {
@@ -342,7 +328,7 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "start_planning_workflow",
-		Description: "Starts a strict manual-gated multi-phase planning workflow under .chatgpt/workflows. Use this for serious product/project planning instead of trying to produce the whole plan in one answer.",
+		Description: "Starts a strict automatic multi-phase planning workflow under .chatgpt/workflows. Use this for serious product/project planning instead of trying to produce the whole plan in one answer.",
 		Annotations: planningWriteTool("Start planning workflow"),
 	}, s.handleStartPlanningWorkflow)
 
@@ -360,19 +346,13 @@ func (s *Server) registerTools() {
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "complete_planning_phase",
-		Description: "Writes the current phase artifact and moves the phase to awaiting_user_approval. It never advances to the next phase automatically.",
+		Description: "Writes the current phase artifact, marks it complete, and opens exactly the next phase. It keeps phases separate without requiring a separate approval tool.",
 		Annotations: planningWriteTool("Complete planning phase"),
 	}, s.handleCompletePlanningPhase)
 
 	mcp.AddTool(s.mcpServer, &mcp.Tool{
-		Name:        "approve_planning_phase",
-		Description: "Advances a workflow only after the user explicitly approves the current phase or says continue.",
-		Annotations: planningWriteTool("Approve planning phase"),
-	}, s.handleApprovePlanningPhase)
-
-	mcp.AddTool(s.mcpServer, &mcp.Tool{
 		Name:        "finalize_planning_workflow",
-		Description: "Writes the final master planning dossier and implementation prompts after all planning phases are approved.",
+		Description: "Writes the final master planning dossier and implementation prompts after all planning phases are complete.",
 		Annotations: planningWriteTool("Finalize planning workflow"),
 	}, s.handleFinalizePlanningWorkflow)
 
@@ -937,48 +917,19 @@ func (s *Server) handleCompletePlanningPhase(ctx context.Context, req *mcp.CallT
 		return errorResult[CompletePlanningPhaseOutput](fmt.Sprintf("Complete phase failed: %v", err))
 	}
 	s.audit("complete_planning_phase", input.ProjectID, result.WrittenTo, "allowed", "", len(input.Content))
-	return jsonContent(CompletePlanningPhaseOutput{
-		SessionID:  result.State.SessionID,
-		PhaseID:    input.PhaseID,
-		WrittenTo:  result.WrittenTo,
-		Status:     workflow.PhaseAwaitingUserApproval,
-		NextAction: result.NextAction,
-		State:      result.State,
-	})
-}
-
-func (s *Server) handleApprovePlanningPhase(ctx context.Context, req *mcp.CallToolRequest, input ApprovePlanningPhaseInput) (*mcp.CallToolResult, ApprovePlanningPhaseOutput, error) {
-	if err := s.checkToolRate("approve_planning_phase"); err != nil {
-		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
-		return errorResult[ApprovePlanningPhaseOutput](err.Error())
-	}
-	root, absPath, err := s.roots.ResolveProject(input.ProjectID)
-	if err != nil {
-		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
-		return errorResult[ApprovePlanningPhaseOutput](fmt.Sprintf("Invalid project: %v", err))
-	}
-	if root.ReadOnly {
-		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", "root is read-only", 0)
-		return errorResult[ApprovePlanningPhaseOutput]("Workflow writes are blocked because this root is read-only")
-	}
-	result, err := workflow.Approve(absPath, input.SessionID, input.PhaseID, time.Now())
-	if err != nil {
-		s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "blocked", err.Error(), 0)
-		return errorResult[ApprovePlanningPhaseOutput](fmt.Sprintf("Approve phase failed: %v", err))
-	}
 	phasePrompt := ""
 	if result.NextPhase != nil {
 		phasePrompt = workflow.PhasePrompt(result.State, *result.NextPhase)
 	}
-	s.audit("approve_planning_phase", input.ProjectID, input.SessionID, "allowed", "", len(phasePrompt))
-	return jsonContent(ApprovePlanningPhaseOutput{
-		SessionID:     result.State.SessionID,
-		ApprovedPhase: input.PhaseID,
-		Status:        result.State.Status,
-		NextPhase:     result.NextPhase,
-		PhasePrompt:   phasePrompt,
-		NextAction:    result.NextAction,
-		State:         result.State,
+	return jsonContent(CompletePlanningPhaseOutput{
+		SessionID:   result.State.SessionID,
+		PhaseID:     input.PhaseID,
+		WrittenTo:   result.WrittenTo,
+		Status:      result.State.Status,
+		NextPhase:   result.NextPhase,
+		PhasePrompt: phasePrompt,
+		NextAction:  result.NextAction,
+		State:       result.State,
 	})
 }
 

@@ -12,16 +12,16 @@ import (
 
 const (
 	SchemaVersion = "1.0"
+	GateAutomatic = "automatic"
 	GateManual    = "manual"
 
 	StatusInProgress           = "in_progress"
 	StatusReadyForFinalization = "ready_for_finalization"
 	StatusCompleted            = "completed"
 
-	PhasePending              = "pending"
-	PhaseInProgress           = "in_progress"
-	PhaseAwaitingUserApproval = "awaiting_user_approval"
-	PhaseApproved             = "approved"
+	PhasePending    = "pending"
+	PhaseInProgress = "in_progress"
+	PhaseCompleted  = "completed"
 )
 
 type PhaseDefinition struct {
@@ -38,7 +38,6 @@ type PhaseState struct {
 	Status       string `json:"status"`
 	ArtifactPath string `json:"artifact_path,omitempty"`
 	CompletedAt  string `json:"completed_at,omitempty"`
-	ApprovedAt   string `json:"approved_at,omitempty"`
 }
 
 type State struct {
@@ -65,11 +64,6 @@ type StartResult struct {
 type CompleteResult struct {
 	State      State
 	WrittenTo  string
-	NextAction string
-}
-
-type ApproveResult struct {
-	State      State
 	NextPhase  *PhaseDefinition
 	NextAction string
 }
@@ -144,7 +138,7 @@ var phaseDefinitions = []PhaseDefinition{
 			"Include relation cardinality and important indexes.",
 			"Identify migration and access-control implications.",
 		},
-		Prompt: "Design the persistence model required by the approved mechanics.",
+		Prompt: "Design the persistence model required by the completed mechanics artifact.",
 	},
 	{
 		ID:    "06-deep-dive",
@@ -246,7 +240,7 @@ func Start(projectAbsPath, projectID, title, originalIntent string, now time.Tim
 		ProjectID:          projectID,
 		Title:              title,
 		OriginalUserIntent: originalIntent,
-		GateMode:           GateManual,
+		GateMode:           GateAutomatic,
 		Status:             StatusInProgress,
 		CurrentPhase:       first.ID,
 		CreatedAt:          ts,
@@ -322,63 +316,30 @@ func Complete(projectAbsPath, sessionID, phaseID, content string, now time.Time)
 		return CompleteResult{}, err
 	}
 	ts := now.UTC().Format(time.RFC3339)
-	state.Phases[idx].Status = PhaseAwaitingUserApproval
+	state.Phases[idx].Status = PhaseCompleted
 	state.Phases[idx].ArtifactPath = artifactPath
 	state.Phases[idx].CompletedAt = ts
 	state.UpdatedAt = ts
+	nextAction := "Continue with the next phase only. Do not merge multiple phases into one artifact."
+	var nextPhase *PhaseDefinition
+	if idx == len(state.Phases)-1 {
+		state.Status = StatusReadyForFinalization
+		state.CurrentPhase = ""
+		nextAction = "All phases are complete. Call finalize_planning_workflow to create the master dossier and implementation prompts."
+	} else {
+		next := phaseDefinitions[idx+1]
+		state.Phases[idx+1].Status = PhaseInProgress
+		state.CurrentPhase = next.ID
+		nextPhase = &next
+	}
 	if err := writeState(projectAbsPath, state); err != nil {
 		return CompleteResult{}, err
 	}
 	return CompleteResult{
 		State:      state,
 		WrittenTo:  artifactPath,
-		NextAction: "Review this phase artifact with the user. Do not continue until the user explicitly approves or says continue.",
-	}, nil
-}
-
-func Approve(projectAbsPath, sessionID, phaseID string, now time.Time) (ApproveResult, error) {
-	state, err := Load(projectAbsPath, sessionID)
-	if err != nil {
-		return ApproveResult{}, err
-	}
-	if state.Status != StatusInProgress {
-		return ApproveResult{}, fmt.Errorf("workflow status must be %s, got %s", StatusInProgress, state.Status)
-	}
-	if phaseID != state.CurrentPhase {
-		return ApproveResult{}, fmt.Errorf("phase %s is not current phase %s", phaseID, state.CurrentPhase)
-	}
-	idx := phaseIndex(state, phaseID)
-	if idx < 0 {
-		return ApproveResult{}, fmt.Errorf("phase not found: %s", phaseID)
-	}
-	if state.Phases[idx].Status != PhaseAwaitingUserApproval {
-		return ApproveResult{}, fmt.Errorf("phase status must be %s, got %s", PhaseAwaitingUserApproval, state.Phases[idx].Status)
-	}
-	ts := now.UTC().Format(time.RFC3339)
-	state.Phases[idx].Status = PhaseApproved
-	state.Phases[idx].ApprovedAt = ts
-	state.UpdatedAt = ts
-	if idx == len(state.Phases)-1 {
-		state.Status = StatusReadyForFinalization
-		state.CurrentPhase = ""
-		if err := writeState(projectAbsPath, state); err != nil {
-			return ApproveResult{}, err
-		}
-		return ApproveResult{
-			State:      state,
-			NextAction: "All phases are approved. Call finalize_planning_workflow to create the master dossier and implementation prompts.",
-		}, nil
-	}
-	next := phaseDefinitions[idx+1]
-	state.Phases[idx+1].Status = PhaseInProgress
-	state.CurrentPhase = next.ID
-	if err := writeState(projectAbsPath, state); err != nil {
-		return ApproveResult{}, err
-	}
-	return ApproveResult{
-		State:      state,
-		NextPhase:  &next,
-		NextAction: "The next phase is now open. Complete only this phase and wait for user approval again.",
+		NextPhase:  nextPhase,
+		NextAction: nextAction,
 	}, nil
 }
 
@@ -391,8 +352,8 @@ func Finalize(projectAbsPath, sessionID, masterPlan string, implementationPrompt
 		return FinalizeResult{}, fmt.Errorf("workflow must be %s before finalization, got %s", StatusReadyForFinalization, state.Status)
 	}
 	for _, phase := range state.Phases {
-		if phase.Status != PhaseApproved {
-			return FinalizeResult{}, fmt.Errorf("phase %s is not approved", phase.ID)
+		if phase.Status != PhaseCompleted {
+			return FinalizeResult{}, fmt.Errorf("phase %s is not complete", phase.ID)
 		}
 	}
 	masterPath := filepath.ToSlash(filepath.Join(".chatgpt", "workflows", sessionID, "final", "master-plan.md"))
@@ -459,7 +420,7 @@ Create only the %s artifact for workflow session %s.
 - Risks
 - Next-Phase Inputs
 
-Manual gate: after completing this phase, wait for user approval before moving to the next phase.
+Automatic gate: after completing this phase, continue with only the next returned phase. Never combine multiple phase artifacts into one response.
 `, phase.ID, phase.Title, phase.ID, state.SessionID, phase.Prompt, state.OriginalUserIntent, markdownList(phase.RequiredSections), markdownList(phase.QualityChecklist))
 }
 
@@ -469,7 +430,7 @@ type: planning_workflow_phase
 workflow_session_id: %s
 phase_id: %s
 project_id: %s
-status: awaiting_user_approval
+status: completed
 created_at: %s
 generated_by: chatgpt
 ---

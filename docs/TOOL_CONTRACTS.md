@@ -194,7 +194,7 @@ Creates or optionally overwrites a project-root `AGENTS.md` explaining the Proje
 
 If `AGENTS.md` already exists and `overwrite` is false, the status is `skipped_existing`.
 
-Freeform planning and implementation-prompt tools are intentionally not exposed. Scoped small/medium implementation work may use `create_quick_plan`. Serious planning must use `start_planning_workflow`, `complete_planning_phase`, explicit approval, and `finalize_planning_workflow`.
+Freeform planning and implementation-prompt tools are intentionally not exposed. Scoped small/medium implementation work may use `create_quick_plan`. Serious planning must use `start_planning_workflow`, `complete_planning_phase` for one phase at a time, and `finalize_planning_workflow`.
 
 ## `create_quick_plan`
 
@@ -231,7 +231,7 @@ Do not use it for product planning, architecture decisions, migrations, auth/per
 
 ## `start_planning_workflow`
 
-Starts a strict manual-gated planning workflow under `.chatgpt/workflows/<session_id>/`.
+Starts a strict automatic staged planning workflow under `.chatgpt/workflows/<session_id>/`.
 
 **Input:**
 ```json
@@ -298,7 +298,7 @@ Returns the active phase contract, prompt, quality checklist, and target artifac
 
 ## `complete_planning_phase`
 
-Writes the current phase artifact and sets the phase to `awaiting_user_approval`. This tool does not advance to the next phase.
+Writes the current phase artifact, marks it complete, and opens exactly the next phase. It does not require a separate approval tool between phases.
 
 **Input:**
 ```json
@@ -316,41 +316,17 @@ Writes the current phase artifact and sets the phase to `awaiting_user_approval`
   "session_id": "20260514-080000-social-app",
   "phase_id": "01-intent",
   "written_to": ".chatgpt/workflows/20260514-080000-social-app/phases/01-intent-intent.md",
-  "status": "awaiting_user_approval",
-  "next_action": "Review this phase artifact with the user...",
-  "state": { "...": "..." }
-}
-```
-
-## `approve_planning_phase`
-
-Advances the workflow only after explicit user approval.
-
-**Input:**
-```json
-{
-  "project_id": "personal-projects:my-app",
-  "session_id": "20260514-080000-social-app",
-  "phase_id": "01-intent"
-}
-```
-
-**Output:**
-```json
-{
-  "session_id": "20260514-080000-social-app",
-  "approved_phase": "01-intent",
   "status": "in_progress",
   "next_phase": { "id": "02-deep-search", "title": "Deep Search" },
   "phase_prompt": "...",
-  "next_action": "The next phase is now open...",
+  "next_action": "Continue with the next phase only...",
   "state": { "...": "..." }
 }
 ```
 
 ## `finalize_planning_workflow`
 
-Writes the final master dossier and implementation prompts after all ten phases are approved.
+Writes the final master dossier and implementation prompts after all ten phases are complete.
 
 **Input:**
 ```json

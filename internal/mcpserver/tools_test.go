@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/enes/project-brain-mcp/internal/app"
+	"github.com/enes/project-brain-mcp/internal/workflow"
 )
 
 func newTestServer(t *testing.T, rootPath string) *Server {
@@ -222,23 +223,14 @@ func TestPlanningWorkflowToolFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("complete phase failed: %v", err)
 	}
-	if completed.Status != "awaiting_user_approval" {
-		t.Fatalf("expected awaiting_user_approval, got %s", completed.Status)
+	if completed.Status != workflow.StatusInProgress {
+		t.Fatalf("expected in_progress workflow, got %s", completed.Status)
 	}
-	if completed.State.CurrentPhase != "01-intent" {
-		t.Fatalf("phase advanced without approval: %s", completed.State.CurrentPhase)
+	if completed.State.CurrentPhase != "02-deep-search" {
+		t.Fatalf("expected next phase to open, got %s", completed.State.CurrentPhase)
 	}
-
-	_, approved, err := srv.handleApprovePlanningPhase(context.Background(), nil, ApprovePlanningPhaseInput{
-		ProjectID: "personal-projects:app",
-		SessionID: start.SessionID,
-		PhaseID:   "01-intent",
-	})
-	if err != nil {
-		t.Fatalf("approve phase failed: %v", err)
-	}
-	if approved.NextPhase == nil || approved.NextPhase.ID != "02-deep-search" {
-		t.Fatalf("expected next phase, got %+v", approved.NextPhase)
+	if completed.NextPhase == nil || completed.NextPhase.ID != "02-deep-search" {
+		t.Fatalf("expected next phase, got %+v", completed.NextPhase)
 	}
 }
 
