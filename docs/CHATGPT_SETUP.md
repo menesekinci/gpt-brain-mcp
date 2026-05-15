@@ -70,6 +70,14 @@ When the tunnel URL or `auth.jwt_secret` changes, reconnect the Project Brain ap
 
 ## 5. Test in ChatGPT
 
+Before testing from ChatGPT, run doctor against the same public URL:
+
+```powershell
+.\server.exe doctor --config configs\project-brain.yml --public-url https://<temporary-name>.trycloudflare.com
+```
+
+If doctor reports public endpoint failure, fix the tunnel or local server first. A visible tool catalog does not prove that later tool calls can still reach the upstream service.
+
 Use prompts like:
 
 ```text
@@ -107,6 +115,13 @@ From the target project root:
 - Ensure `server.exe` is running.
 - Ensure `cloudflared` is running.
 - Check the printed tunnel URL and `/healthz`.
+- Run `.\server.exe doctor --config configs\project-brain.yml --public-url https://<your-public-host>`.
+
+### 502 / 1033 from Cloudflare
+
+- 502 usually means Cloudflare reached the tunnel edge, but the local service behind it did not return a valid response.
+- 1033 usually means the public hostname has no active tunnel connection.
+- Restart `cloudflared`, confirm it forwards to `http://127.0.0.1:3939`, then reconnect or refresh the ChatGPT app if the URL changed.
 
 ### Tools not discovered
 

@@ -1,17 +1,25 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/enes/project-brain-mcp/internal/app"
 	"github.com/enes/project-brain-mcp/internal/audit"
+	"github.com/enes/project-brain-mcp/internal/diagnostics"
 	"github.com/enes/project-brain-mcp/internal/mcpserver"
 )
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "doctor" {
+		runDoctor(os.Args[2:])
+		return
+	}
+
 	var (
 		configPath = flag.String("config", "", "Path to project-brain.yml config file")
 		addr       = flag.String("addr", "", "Listen address (overrides config)")
@@ -60,5 +68,27 @@ func main() {
 
 	if err := server.Serve(listenAddr); err != nil {
 		log.Fatalf("Server error: %v", err)
+	}
+}
+
+func runDoctor(args []string) {
+	fs := flag.NewFlagSet("doctor", flag.ExitOnError)
+	configPath := fs.String("config", "", "Path to project-brain.yml config file")
+	publicURL := fs.String("public-url", "", "Public connector base URL, e.g. https://xxx.trycloudflare.com")
+	if err := fs.Parse(args); err != nil {
+		log.Fatalf("Failed to parse doctor flags: %v", err)
+	}
+
+	cfg, err := app.LoadConfig(*configPath)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
+	defer cancel()
+
+	report := diagnostics.Run(ctx, cfg, *configPath, *publicURL)
+	fmt.Print(diagnostics.Format(report))
+	if report.HasFailures() {
+		os.Exit(1)
 	}
 }

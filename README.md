@@ -49,7 +49,15 @@ The server listens on `127.0.0.1:3939` by default.
 curl http://127.0.0.1:3939/healthz
 ```
 
-### 4. Connect From ChatGPT
+### 4. Run Doctor
+
+```bash
+./server doctor --config ./configs/project-brain.yml --public-url https://<your-public-host>
+```
+
+Doctor checks local health, public tunnel health, configured root access, OAuth issuer configuration, and `cloudflared` availability. Use it first when ChatGPT can see the tool catalog but tool calls fail with upstream or external service errors.
+
+### 5. Connect From ChatGPT
 
 Use a tunnel URL that points to the local server, then configure the MCP app endpoint as:
 
@@ -135,6 +143,8 @@ Implementation agents should read `fromgpt.md` before working and write `togpt.m
 `launch.bat` and `launch.sh` use a Cloudflare Quick Tunnel. This is good for testing and local iteration, but the URL is random and temporary. When the URL or OAuth secrets change, reconnect the Project Brain app in ChatGPT because issued OAuth tokens are bound to the issuer URL and signing key.
 
 For daily use, prefer a named Cloudflare Tunnel with your own hostname. Point that hostname to `http://127.0.0.1:3939`, set `server.public_base_url` / `auth.issuer_url` to the stable HTTPS URL, then use `https://<your-hostname>/mcp/` in ChatGPT.
+
+If the public endpoint returns Cloudflare 502, the tunnel reached Cloudflare but could not get a valid response from the local service. If it returns Cloudflare 1033, the hostname has no active tunnel connection. In both cases, run `server doctor --config configs/project-brain.yml --public-url https://<your-public-host>` before changing MCP tools.
 
 ## Documentation
 
