@@ -253,6 +253,8 @@ type FinalizePlanningWorkflowOutput struct {
 	SessionID             string         `json:"session_id" jsonschema:"Planning workflow session identifier"`
 	MasterPlanPath        string         `json:"master_plan_path" jsonschema:"Relative path of the final master planning dossier"`
 	ImplementationPrompts []string       `json:"implementation_prompts" jsonschema:"Relative paths of generated implementation prompts"`
+	AgentsPath            string         `json:"agents_path" jsonschema:"Relative path of project-root AGENTS.md"`
+	AgentsStatus          string         `json:"agents_status" jsonschema:"created or skipped_existing"`
 	Status                string         `json:"status" jsonschema:"Workflow status after finalization"`
 	State                 workflow.State `json:"state" jsonschema:"Workflow state snapshot"`
 }
@@ -957,6 +959,8 @@ func (s *Server) handleFinalizePlanningWorkflow(ctx context.Context, req *mcp.Ca
 		SessionID:             result.State.SessionID,
 		MasterPlanPath:        result.MasterPlanPath,
 		ImplementationPrompts: result.ImplementationPrompts,
+		AgentsPath:            result.AgentsPath,
+		AgentsStatus:          result.AgentsStatus,
 		Status:                result.State.Status,
 		State:                 result.State,
 	})

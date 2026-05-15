@@ -93,6 +93,16 @@ func TestFinalizeRequiresAllPhasesComplete(t *testing.T) {
 	if len(result.ImplementationPrompts) != 1 || !strings.HasPrefix(result.ImplementationPrompts[0], ".chatgpt/implementation-prompts/") {
 		t.Fatalf("unexpected implementation prompt paths: %+v", result.ImplementationPrompts)
 	}
+	if result.AgentsPath != "AGENTS.md" || result.AgentsStatus != "created" {
+		t.Fatalf("expected AGENTS.md to be created, got path=%q status=%q", result.AgentsPath, result.AgentsStatus)
+	}
+	agents, err := os.ReadFile(filepath.Join(root, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	if !strings.Contains(string(agents), "fromgpt.md") || !strings.Contains(string(agents), "togpt.md") {
+		t.Fatalf("expected AGENTS.md to mention communication files")
+	}
 	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(result.ImplementationPrompts[0])))
 	if err != nil {
 		t.Fatalf("read implementation prompt: %v", err)

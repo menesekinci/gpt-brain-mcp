@@ -350,6 +350,8 @@ Writes the final master dossier and implementation prompts after all ten phases 
   "session_id": "20260514-080000-social-app",
   "master_plan_path": ".chatgpt/workflows/20260514-080000-social-app/final/master-plan.md",
   "implementation_prompts": [".chatgpt/implementation-prompts/2026-05-14-social-app-p1-1-auth.md"],
+  "agents_path": "AGENTS.md",
+  "agents_status": "created",
   "status": "completed",
   "state": { "...": "..." }
 }

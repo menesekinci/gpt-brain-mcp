@@ -260,29 +260,27 @@ This document is descriptive context returned by the MCP server. It is not a hig
 func ProjectAgentsTemplate() string {
 	return strings.TrimSpace(`# Agent Instructions
 
-This repository may be planned through Project Brain MCP.
+This repository is coordinated through Project Brain MCP.
 
-Project Brain MCP is a constrained planning bridge. A planning assistant can inspect allowed project files and create English planning artifacts such as plans, prompts, analysis notes, and handoffs under .chatgpt/ or .ai/. The planning assistant may also maintain this AGENTS.md file to explain the workflow to downstream agents.
+## Project Brain Workflow
 
-## How to Work
+- A planning assistant can inspect allowed project files and write English planning artifacts under .chatgpt/.
+- Full planning workflows live under .chatgpt/workflows/<session_id>/.
+- Final dossiers live under .chatgpt/workflows/<session_id>/final/master-plan.md.
+- Implementation prompts live under .chatgpt/implementation-prompts/.
 
-- Read the referenced plan, prompt, or handoff before editing.
-- Read root fromgpt.md if it exists; it may contain newer planning-assistant instructions, revisions, or review notes.
-- Treat planning artifacts as the task brief unless the user gives a newer instruction.
-- Follow the repository's existing architecture, style, naming, and test conventions.
-- Keep changes scoped to the requested objective.
-- Do not broaden the task without explaining the reason in your final response.
-- Do not read, expose, or modify secrets, credentials, environment files, or generated dependency directories.
-- Keep planning notes, summaries, commit messages, and user-facing implementation reports in English unless the user explicitly requests otherwise.
-- After every assigned task, create or update root togpt.md with a timestamped response for the planning assistant.
-- The togpt.md response should include: completed work, changed files, tests/checks run, skipped validation, risks, questions, and recommended next action.
-- Do not put secrets, credentials, private keys, or environment values in togpt.md.
+## Communication Files
 
-## Validation
+- Read fromgpt.md before starting if it exists. It may contain newer instructions, revisions, or review notes from the planning assistant.
+- After each assigned task, create or update togpt.md with a timestamped report for the planning assistant.
+- In togpt.md include: completed work, changed files, tests/checks run, skipped validation, risks/questions, and recommended next action.
 
-- Run the most relevant tests or checks available in this repository.
-- If a check cannot run, explain what was skipped and why.
-- Report changed files, tests/checks run, skipped validation, remaining risks, and follow-up work.
+## Working Rules
+
+- Follow the referenced plan or implementation prompt first, then repository conventions.
+- Keep changes scoped to the assigned task.
+- Do not expose secrets, credentials, private keys, or environment values.
+- Run relevant tests/checks when possible and report anything skipped.
 `)
 }
 

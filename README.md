@@ -125,7 +125,7 @@ For serious product planning, use the staged workflow instead of one large answe
 2. Complete only the current phase with `complete_planning_phase`.
 3. Continue with only the next phase returned by the tool.
 4. Repeat until `10-review-test` is complete.
-5. Call `finalize_planning_workflow` to write `final/master-plan.md` and implementation prompts.
+5. Call `finalize_planning_workflow` to write `final/master-plan.md`, implementation prompts, and a short root `AGENTS.md` if one does not already exist.
 6. Run your chosen implementation agent from the target project root and pass a generated prompt file:
 
 ```powershell

@@ -75,6 +75,8 @@ type FinalizeResult struct {
 	State                 State
 	MasterPlanPath        string
 	ImplementationPrompts []string
+	AgentsPath            string
+	AgentsStatus          string
 }
 
 var phaseDefinitions = []PhaseDefinition{
@@ -404,6 +406,10 @@ func Finalize(projectAbsPath, sessionID, masterPlan string, implementationPrompt
 			return FinalizeResult{}, fmt.Errorf("phase %s is not complete", phase.ID)
 		}
 	}
+	agentsPath, agentsStatus, err := ensureAgentsMarkdown(projectAbsPath)
+	if err != nil {
+		return FinalizeResult{}, err
+	}
 	masterPath := filepath.ToSlash(filepath.Join(".chatgpt", "workflows", sessionID, "final", "master-plan.md"))
 	if err := writeFile(projectAbsPath, masterPath, []byte(FinalMarkdown(state, masterPlan, now))); err != nil {
 		return FinalizeResult{}, err
@@ -426,7 +432,7 @@ func Finalize(projectAbsPath, sessionID, masterPlan string, implementationPrompt
 	if err := writeState(projectAbsPath, state); err != nil {
 		return FinalizeResult{}, err
 	}
-	return FinalizeResult{State: state, MasterPlanPath: masterPath, ImplementationPrompts: promptPaths}, nil
+	return FinalizeResult{State: state, MasterPlanPath: masterPath, ImplementationPrompts: promptPaths, AgentsPath: agentsPath, AgentsStatus: agentsStatus}, nil
 }
 
 type ImplementationPrompt struct {
@@ -515,6 +521,8 @@ generated_by: chatgpt
 
 You are the implementation agent for this repository.
 
+Before editing, read root AGENTS.md. It explains the Project Brain MCP workflow, planning artifacts, and the fromgpt.md/togpt.md communication files.
+
 Before editing, read root fromgpt.md if it exists. It may contain newer planning-assistant instructions or revisions.
 
 ## Source Dossier
@@ -550,6 +558,47 @@ Before editing, read root fromgpt.md if it exists. It may contain newer planning
 
 Also create or update root togpt.md with a timestamped report containing completed work, changed files, tests/checks run, skipped validation, risks, questions, and recommended next action.
 `, state.SessionID, state.ProjectID, now.UTC().Format(time.RFC3339), fallback(prompt.Title, "Implementation Slice"), masterPlanPath, fallback(prompt.Objective, "Implement the referenced slice from the master planning dossier."), markdownListOr(prompt.ContextFiles, "Inspect the repository and the source dossier before editing."), markdownListOr(prompt.Constraints, "Keep the change scoped to this implementation slice."), markdownListOr(prompt.AcceptanceCriteria, "Relevant checks pass and the source dossier requirements are satisfied."), fallback(prompt.Notes, "None."))
+}
+
+func AgentsMarkdown() string {
+	return strings.TrimSpace(`# Agent Instructions
+
+This repository is coordinated through Project Brain MCP.
+
+## Project Brain Workflow
+
+- A planning assistant can inspect allowed project files and write English planning artifacts under .chatgpt/.
+- Full planning workflows live under .chatgpt/workflows/<session_id>/.
+- Final dossiers live under .chatgpt/workflows/<session_id>/final/master-plan.md.
+- Implementation prompts live under .chatgpt/implementation-prompts/.
+
+## Communication Files
+
+- Read fromgpt.md before starting if it exists. It may contain newer instructions, revisions, or review notes from the planning assistant.
+- After each assigned task, create or update togpt.md with a timestamped report for the planning assistant.
+- In togpt.md include: completed work, changed files, tests/checks run, skipped validation, risks/questions, and recommended next action.
+
+## Working Rules
+
+- Follow the referenced plan or implementation prompt first, then repository conventions.
+- Keep changes scoped to the assigned task.
+- Do not expose secrets, credentials, private keys, or environment values.
+- Run relevant tests/checks when possible and report anything skipped.
+`)
+}
+
+func ensureAgentsMarkdown(projectAbsPath string) (string, string, error) {
+	relPath := "AGENTS.md"
+	absPath := filepath.Join(projectAbsPath, relPath)
+	if _, err := os.Stat(absPath); err == nil {
+		return relPath, "skipped_existing", nil
+	} else if err != nil && !os.IsNotExist(err) {
+		return "", "", fmt.Errorf("inspect AGENTS.md: %w", err)
+	}
+	if err := writeFile(projectAbsPath, relPath, []byte(AgentsMarkdown()+"\n")); err != nil {
+		return "", "", fmt.Errorf("write AGENTS.md: %w", err)
+	}
+	return relPath, "created", nil
 }
 
 func StateRelPath(sessionID string) string {
