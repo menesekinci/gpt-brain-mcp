@@ -102,6 +102,49 @@ func TestFinalizeRequiresAllPhasesComplete(t *testing.T) {
 	}
 }
 
+func TestFinalizeMigratesLegacyAwaitingApprovalWorkflow(t *testing.T) {
+	root := t.TempDir()
+	start, err := Start(root, "personal-projects:app", "Social App", "Build a social app.", fixedTime())
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+	state := start.State
+	state.GateMode = GateManual
+	state.Status = StatusInProgress
+	state.CurrentPhase = "10-review-test"
+	for i := range state.Phases {
+		state.Phases[i].Status = PhaseCompleted
+		state.Phases[i].ArtifactPath = PhaseArtifactRelPath(state.SessionID, state.Phases[i].ID, state.Phases[i].Title)
+		state.Phases[i].CompletedAt = fixedTime().Format(time.RFC3339)
+	}
+	state.Phases[len(state.Phases)-1].Status = "awaiting_user_approval"
+	if err := writeState(root, state); err != nil {
+		t.Fatalf("write legacy state: %v", err)
+	}
+
+	loaded, err := Load(root, state.SessionID)
+	if err != nil {
+		t.Fatalf("Load failed: %v", err)
+	}
+	if loaded.GateMode != GateAutomatic {
+		t.Fatalf("expected automatic gate after migration, got %s", loaded.GateMode)
+	}
+	if loaded.Status != StatusReadyForFinalization {
+		t.Fatalf("expected ready_for_finalization, got %s", loaded.Status)
+	}
+	if loaded.Phases[len(loaded.Phases)-1].Status != PhaseCompleted {
+		t.Fatalf("expected last phase completed, got %s", loaded.Phases[len(loaded.Phases)-1].Status)
+	}
+
+	result, err := Finalize(root, state.SessionID, "# Master Plan", nil, fixedTime())
+	if err != nil {
+		t.Fatalf("Finalize failed for legacy workflow: %v", err)
+	}
+	if result.State.Status != StatusCompleted {
+		t.Fatalf("expected completed, got %s", result.State.Status)
+	}
+}
+
 func TestPhaseTemplatesContainRequiredEnglishHeadings(t *testing.T) {
 	for _, phase := range Phases() {
 		for _, want := range []string{"Summary", "Evidence", "Decisions", "Open Questions", "Risks", "Next-Phase Inputs"} {

@@ -22,6 +22,8 @@ const (
 	PhasePending    = "pending"
 	PhaseInProgress = "in_progress"
 	PhaseCompleted  = "completed"
+
+	legacyPhaseAwaitingUserApproval = "awaiting_user_approval"
 )
 
 type PhaseDefinition struct {
@@ -280,7 +282,52 @@ func Load(projectAbsPath, sessionID string) (State, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return State{}, err
 	}
-	return state, nil
+	return normalizeLegacyState(state), nil
+}
+
+func normalizeLegacyState(state State) State {
+	if state.GateMode == "" || state.GateMode == GateManual {
+		state.GateMode = GateAutomatic
+	}
+	for i := range state.Phases {
+		if state.Phases[i].Status == legacyPhaseAwaitingUserApproval {
+			state.Phases[i].Status = PhaseCompleted
+			if state.Phases[i].CompletedAt == "" {
+				state.Phases[i].CompletedAt = state.UpdatedAt
+			}
+		}
+	}
+	if state.Status != StatusInProgress {
+		return state
+	}
+	if allPhasesCompleted(state) {
+		state.Status = StatusReadyForFinalization
+		state.CurrentPhase = ""
+		return state
+	}
+	idx := phaseIndex(state, state.CurrentPhase)
+	if idx >= 0 && state.Phases[idx].Status == PhaseCompleted {
+		for next := idx + 1; next < len(state.Phases); next++ {
+			if state.Phases[next].Status != PhaseCompleted {
+				state.Phases[next].Status = PhaseInProgress
+				state.CurrentPhase = state.Phases[next].ID
+				return state
+			}
+		}
+	}
+	return state
+}
+
+func allPhasesCompleted(state State) bool {
+	if len(state.Phases) == 0 {
+		return false
+	}
+	for _, phase := range state.Phases {
+		if phase.Status != PhaseCompleted {
+			return false
+		}
+	}
+	return true
 }
 
 func CurrentPhase(state State) (PhaseDefinition, error) {
