@@ -24,6 +24,7 @@ const (
 	PhaseCompleted  = "completed"
 
 	legacyPhaseAwaitingUserApproval = "awaiting_user_approval"
+	legacyPhaseApproved             = "approved"
 )
 
 type PhaseDefinition struct {
@@ -290,7 +291,7 @@ func normalizeLegacyState(state State) State {
 		state.GateMode = GateAutomatic
 	}
 	for i := range state.Phases {
-		if state.Phases[i].Status == legacyPhaseAwaitingUserApproval {
+		if state.Phases[i].Status == legacyPhaseAwaitingUserApproval || state.Phases[i].Status == legacyPhaseApproved {
 			state.Phases[i].Status = PhaseCompleted
 			if state.Phases[i].CompletedAt == "" {
 				state.Phases[i].CompletedAt = state.UpdatedAt

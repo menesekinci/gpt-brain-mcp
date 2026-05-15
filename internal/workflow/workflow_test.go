@@ -113,7 +113,7 @@ func TestFinalizeMigratesLegacyAwaitingApprovalWorkflow(t *testing.T) {
 	state.Status = StatusInProgress
 	state.CurrentPhase = "10-review-test"
 	for i := range state.Phases {
-		state.Phases[i].Status = PhaseCompleted
+		state.Phases[i].Status = "approved"
 		state.Phases[i].ArtifactPath = PhaseArtifactRelPath(state.SessionID, state.Phases[i].ID, state.Phases[i].Title)
 		state.Phases[i].CompletedAt = fixedTime().Format(time.RFC3339)
 	}
